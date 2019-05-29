@@ -16,9 +16,4 @@ public @interface PreferenceEntity {
      * 文件名
      */
     String fileName() default "default_sp_file";
-
-    /**
-     * 保存路径
-     */
-    String savePath() default "";
 }
