@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * 2019-05-28
  */
 @Target(ElementType.TYPE)
-@Retention(RetentionPolicy.CLASS)
+@Retention(RetentionPolicy.SOURCE)
 public @interface PreferenceEntity {
     /**
      * 文件名
