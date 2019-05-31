@@ -62,6 +62,7 @@ public class PreferenceProcessor extends AbstractProcessor {
             try {
                 //检查类信息
                 checkValidEntityType(type);
+
                 //解析
                 processPreferenceEntity(type);
             } catch (IllegalAccessException e) {
@@ -95,6 +96,12 @@ public class PreferenceProcessor extends AbstractProcessor {
     private void generatePreferenceInjector(PreferenceEntityClass entityClass) {
         try {
             PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements);
+            //创建一些公用的帮助类
+            PublicJavaFile.createDataAction(entityClass.getPackageName(), mFiler);
+            PublicJavaFile.createDispatcher(entityClass.getPackageName(), mFiler);
+            PublicJavaFile.createPreferenceManager(entityClass.getPackageName(), mFiler);
+            PublicJavaFile.createPreferenceCallBack(entityClass.getPackageName(), mFiler);
+            //创建具体的实现类
             JavaFile javaFile = JavaFile.builder(entityClass.getPackageName(), generator.getTypeSpec()).build();
             javaFile.writeTo(mFiler);
         } catch (IOException e) {

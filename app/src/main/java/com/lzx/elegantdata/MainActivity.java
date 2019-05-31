@@ -2,8 +2,7 @@ package com.lzx.elegantdata;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-
-import com.lzx.annoation.PreferenceEntity;
+import android.util.Log;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -13,26 +12,12 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // LzxSpFileImpl.getInstance(this).putName("dasldkhasldk");
+
+        String name = LzxSpFileImpl.getInstance(this).getNameSync();
+        Log.i("XIAN", "name = " + name);
+
+
 
     }
-
-    // @Database(entities = {User.class}, version = 1)
-    // public static abstract class AppDatabase extends RoomDatabase {
-    //
-    //
-    // }
-    //
-    // public static abstract class LzxDatabase extends ElegantDataBase {
-    //
-    //     public abstract PreferenceKeyInfo getPreferenceKeyInfo();
-    //
-    // }
-    //
-    // public static class LzxDatabaseImpl extends LzxDatabase {
-    //
-    //     @Override
-    //     public PreferenceKeyInfo getPreferenceKeyInfo() {
-    //         return new PreferenceKeyInfo();
-    //     }
-    // }
 }

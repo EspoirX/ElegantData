@@ -95,6 +95,10 @@ public class PreferenceEntityClass {
         return clazzName;
     }
 
+    public List<PreferenceEntityField> getKeyFields() {
+        return keyFields;
+    }
+
     public String getSpFileName() {
         return spFileName;
     }

@@ -1,6 +1,5 @@
 package com.lzx.elegantdata;
 
-import com.lzx.annoation.Embedded;
 import com.lzx.annoation.PreferenceEntity;
 
 /**
@@ -8,9 +7,10 @@ import com.lzx.annoation.PreferenceEntity;
  * 2019-05-28
  */
 @PreferenceEntity(fileName = "LzxSpFile")
-public abstract class PreferenceKeyInfo {
+public class PreferenceKeyInfo {
     public String name;
     public int age;
-    @Embedded
-    public User user;
+    public float height;
+    public long width;
+
 }
