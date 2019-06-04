@@ -80,7 +80,7 @@ public class PreferenceEntityClass {
         clazzName = typeElement.getSimpleName().toString();
         //获取PreferenceEntity注解上的值
         spFileName = Strings.isNullOrEmpty(preferenceEntity.fileName())
-                ? clazzName.toUpperCase() : preferenceEntity.fileName();
+                ? clazzName.toUpperCase()+"_preferences" : preferenceEntity.fileName();
     }
 
     public String getPackageName() {

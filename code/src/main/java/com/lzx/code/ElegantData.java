@@ -11,41 +11,28 @@ import com.lzx.annoation.PreferenceEntity;
  */
 public class ElegantData {
 
-
-    public static void inject(Class<?> clazz) {
-        PreferenceEntity preferenceEntity = clazz.getAnnotation(PreferenceEntity.class);
-        if (preferenceEntity != null) {
-
-        }
-    }
-
-    public static <T extends ElegantDataBase> ElegantDataBase.Builder<T> databaseBuilder(
+    public static <T extends FileDataBase> FileDataBase.Builder<T> preferenceBuilder(
             @NonNull Context context, @NonNull Class<T> klass) {
-        return new ElegantDataBase.Builder<>(klass, context);
+        return new FileDataBase.Builder<>(klass, "", context);
     }
+
+    public static <T extends FileDataBase> FileDataBase.Builder<T> fileBuilder(
+            @NonNull Context context, String destFileDir, @NonNull Class<T> klass) {
+        return new FileDataBase.Builder<>(klass, destFileDir, context);
+    }
+
 
     static <T, C> T getGeneratedImplementation(Class<C> klass, String suffix) {
         final String fullPackage = klass.getPackage().getName();
         String name = klass.getCanonicalName();
-        final String postPackageName = fullPackage.isEmpty()
-                ? name
-                : (name.substring(fullPackage.length() + 1));
+        final String postPackageName = fullPackage.isEmpty() ? name : (name.substring(fullPackage.length() + 1));
         final String implName = postPackageName.replace('.', '_') + suffix;
-        //noinspection TryWithIdenticalCatches
         try {
-
             @SuppressWarnings("unchecked") final Class<T> aClass = (Class<T>) Class.forName(
                     fullPackage.isEmpty() ? implName : fullPackage + "." + implName);
             return aClass.newInstance();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("cannot find implementation for "
-                    + klass.getCanonicalName() + ". " + implName + " does not exist");
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("Cannot access the constructor"
-                    + klass.getCanonicalName());
-        } catch (InstantiationException e) {
-            throw new RuntimeException("Failed to create an instance of "
-                    + klass.getCanonicalName());
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
         }
     }
 }

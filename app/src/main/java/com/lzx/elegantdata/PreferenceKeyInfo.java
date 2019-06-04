@@ -1,5 +1,7 @@
 package com.lzx.elegantdata;
 
+import android.content.SharedPreferences;
+
 import com.lzx.annoation.PreferenceEntity;
 
 /**
@@ -7,10 +9,13 @@ import com.lzx.annoation.PreferenceEntity;
  * 2019-05-28
  */
 @PreferenceEntity(fileName = "LzxSpFile")
-public class PreferenceKeyInfo {
-    public String name;
-    public int age;
-    public float height;
-    public long width;
+public interface PreferenceKeyInfo {
+
+    String name = "";
+    int age = 0;
+    float height = 0;
+    long width = 0;
+
+
 
 }

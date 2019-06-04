@@ -115,16 +115,16 @@ public class PreferenceEntityField {
                 this.typeStringName = "String";
             } else {
                 //如果不是基础类型，则是object类型，判断有没有被Embedded修饰
-                if (!hasEmbedded) {
-                    throw new IllegalAccessException(
-                            String.format(
-                                    "Field \'%s\' can not use %s type. \nObjects should be annotated with '@Embedded'.",
-                                    mVariableElement.getSimpleName(), this.typeName.toString()));
-                } else {
-                    //更改标记位
-                    this.typeStringName = "String";
-                    this.isObjectField = true;
-                }
+                // if (!hasEmbedded) {
+                //     throw new IllegalAccessException(
+                //             String.format(
+                //                     "Field \'%s\' can not use %s type. \nObjects should be annotated with '@Embedded'.",
+                //                     mVariableElement.getSimpleName(), this.typeName.toString()));
+                // } else {
+                //     //更改标记位
+                //     this.typeStringName = "String";
+                //     this.isObjectField = true;
+                // }
             }
         }
     }
