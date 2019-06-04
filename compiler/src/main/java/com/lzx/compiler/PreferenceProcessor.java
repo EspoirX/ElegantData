@@ -6,7 +6,6 @@ import com.lzx.annoation.Embedded;
 import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.NameField;
 import com.lzx.annoation.PreferenceEntity;
-import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.TypeName;
 
 import java.io.IOException;
@@ -26,9 +25,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 
@@ -78,7 +76,6 @@ public class PreferenceProcessor extends AbstractProcessor {
         for (Element element : markElementSet) {
             TypeElement type = (TypeElement) element;
 
-
             markInfo = new ElegantDataMarkInfo();
             markInfo.markClassName = type.getSimpleName().toString();
             List<ElegantDataMarkInfo.FieldInfo> fieldInfos = new ArrayList<>();
@@ -101,18 +98,26 @@ public class PreferenceProcessor extends AbstractProcessor {
         }
         //返回所有被注解了@PreferenceEntity的元素的列表
         Set<? extends Element> preferenceElementSet = roundEnv.getElementsAnnotatedWith(PreferenceEntity.class);
+
+        List<PreferenceEntityClass> entityClassList = new ArrayList<>();
         for (Element element : preferenceElementSet) {
             //类信息
             TypeElement type = (TypeElement) element;
             try {
                 //检查类信息
                 checkValidEntityType(type);
-                //解析注解
-                processPreferenceEntity(type, markInfo);
+                PreferenceEntityClass entityClass = new PreferenceEntityClass(type, mElements, mMessager);
+                entityClassList.add(entityClass);
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
         }
+
+        for (PreferenceEntityClass entityClass : entityClassList) {
+            //解析注解
+            generatePreferenceInjector(entityClass, markInfo);
+        }
+
         return false;
     }
 
@@ -132,20 +137,13 @@ public class PreferenceProcessor extends AbstractProcessor {
         }
     }
 
-    private void processPreferenceEntity(TypeElement type, ElegantDataMarkInfo markInfo) throws IllegalAccessException {
-        PreferenceEntityClass entityClass = new PreferenceEntityClass(type, mElements, mMessager);
-        generatePreferenceInjector(entityClass, markInfo);
-    }
-
     private void generatePreferenceInjector(PreferenceEntityClass entityClass, ElegantDataMarkInfo markInfo) {
+        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements, mFiler, markInfo);
         try {
-            PublicJavaFile.createDispatcher(entityClass.getPackageName(), mFiler);
-            PublicJavaFile.createPreferenceCallBack(entityClass.getPackageName(), mFiler);
-
-            PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements, markInfo);
-            generator.createPreferenceDaoImpl(mFiler);
-            generator.createDataBaseImpl(mFiler);
-        } catch (IOException e) {
+            generator.createPreferenceDaoInterface();
+            generator.createPreferenceDaoImpl();
+            generator.createDataBaseImpl();
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }

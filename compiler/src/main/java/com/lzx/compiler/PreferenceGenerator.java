@@ -15,6 +15,7 @@ import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.util.Elements;
 
+import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -25,7 +26,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  */
 class PreferenceGenerator {
 
-    private static final String IMPL_SUFFIX = "_Impl";
+    public static final String IMPL_SUFFIX = "_Impl";
     private static final String CODE_PACKAGE_NAME = "com.lzx.code";
     private static final String preferencesName = "mPreferences";
     private PreferenceEntityClass mEntityClass;
@@ -34,10 +35,12 @@ class PreferenceGenerator {
     private String[] putArray;
     private String[] getArray;
     private TypeName[] typeNameArray;
+    private Filer mFiler;
 
-    PreferenceGenerator(PreferenceEntityClass entityClass, Elements elements, ElegantDataMarkInfo markInfo) {
+    PreferenceGenerator(PreferenceEntityClass entityClass, Elements elements, Filer filer, ElegantDataMarkInfo markInfo) {
         mEntityClass = entityClass;
         mElements = elements;
+        mFiler = filer;
         this.markInfo = markInfo;
         putArray = new String[]{"putString", "putInt", "putLong", "putFloat", "putBoolean"};
         getArray = new String[]{"getString", "getInt", "getLong", "getFloat", "getBoolean"};
@@ -45,9 +48,88 @@ class PreferenceGenerator {
     }
 
     /**
+     * 创建Dao接口类
+     */
+    void createPreferenceDaoInterface() throws IOException {
+        List<MethodSpec> methodSpecs = new ArrayList<>();
+        List<PreferenceEntityField> fieldList = mEntityClass.getKeyFields();
+        for (PreferenceEntityField field : fieldList) {
+            String fieldName = toUpperFirstChar(field.getFieldName());
+            TypeName typeName = field.getTypeName();
+            String putMethodName = "put" + fieldName;
+            String putAsyncMethodName = "put" + fieldName + "Async";
+            String getMethodName = "get" + fieldName;
+            String getAsyncMethodName = "get" + fieldName + "Async";
+
+            methodSpecs.add(MethodSpec.methodBuilder(putMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(typeName, "value")
+                    .build());
+            methodSpecs.add(MethodSpec.methodBuilder(putAsyncMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(typeName, "value")
+                    .build());
+            methodSpecs.add(MethodSpec.methodBuilder(getMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .returns(typeName)
+                    .build());
+            methodSpecs.add(MethodSpec.methodBuilder(getMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(typeName, "defValue")
+                    .returns(typeName)
+                    .build());
+            methodSpecs.add(MethodSpec.methodBuilder(getAsyncMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(getPreferenceCallBack(), "callBack")
+                    .addParameter(typeName, "defValue")
+                    .build());
+            methodSpecs.add(MethodSpec.methodBuilder(getAsyncMethodName)
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(getPreferenceCallBack(), "callBack")
+                    .build());
+        }
+        for (int i = 0; i < putArray.length; i++) {
+            methodSpecs.add(MethodSpec.methodBuilder(putArray[i])
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(TypeName.get(String.class), "key")
+                    .addParameter(typeNameArray[i], "value")
+                    .returns(TypeName.BOOLEAN)
+                    .build());
+        }
+        for (int i = 0; i < getArray.length; i++) {
+            methodSpecs.add(MethodSpec.methodBuilder(getArray[i])
+                    .addModifiers(ABSTRACT, PUBLIC)
+                    .addParameter(TypeName.get(String.class), "key")
+                    .addParameter(typeNameArray[i], "value")
+                    .returns(typeNameArray[i])
+                    .build());
+        }
+        methodSpecs.add(MethodSpec.methodBuilder("remove")
+                .addModifiers(ABSTRACT, PUBLIC)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(TypeName.get(String.class), "key")
+                .build());
+        methodSpecs.add(MethodSpec.methodBuilder("clear")
+                .addModifiers(ABSTRACT, PUBLIC)
+                .returns(TypeName.BOOLEAN)
+                .build());
+        methodSpecs.add(MethodSpec.methodBuilder("contains")
+                .addModifiers(ABSTRACT, PUBLIC)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(TypeName.get(String.class), "key")
+                .build());
+        TypeSpec typeSpec = TypeSpec.interfaceBuilder("I" + mEntityClass.getClazzName() + "Dao")
+                .addModifiers(Modifier.PUBLIC)
+                .addMethods(methodSpecs)
+                .build();
+        JavaFile javaFile = JavaFile.builder(getPackageName(), typeSpec).build();
+        javaFile.writeTo(mFiler);
+    }
+
+    /**
      * 创建Dao实现类
      */
-    void createPreferenceDaoImpl(Filer filer) throws IOException {
+    void createPreferenceDaoImpl() throws IOException {
         List<MethodSpec> methodSpecs = new ArrayList<>();
         methodSpecs.add(MethodSpec.constructorBuilder()
                 .addParameter(getSharedPreferences(), "sharedPreferences")
@@ -55,11 +137,11 @@ class PreferenceGenerator {
                 .addStatement("mDispatcher = new DataDispatcher()")
                 .build());
         methodSpecs.addAll(createPutAndGetMethod());
-        //创建get
+        //创建put
         for (int i = 0; i < putArray.length; i++) {
             methodSpecs.add(createPutImplMethod(putArray[i], typeNameArray[i]));
         }
-        //创建put
+        //创建get
         for (int i = 0; i < getArray.length; i++) {
             methodSpecs.add(createGetImplMethod(getArray[i], typeNameArray[i]));
         }
@@ -74,11 +156,11 @@ class PreferenceGenerator {
                 .addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(mEntityClass.getTypeName())
                 .addField(getSharedPreferences(), preferencesName, Modifier.PRIVATE)
-                .addField(ClassName.get(getPackageName(), "DataDispatcher"), "mDispatcher", PRIVATE)
+                .addField(ClassName.get(CODE_PACKAGE_NAME, "DataDispatcher"), "mDispatcher", PRIVATE)
                 .addMethods(methodSpecs)
                 .build();
         JavaFile javaFile = JavaFile.builder(mEntityClass.getPackageName(), typeSpec).build();
-        javaFile.writeTo(filer);
+        javaFile.writeTo(mFiler);
     }
 
     /**
@@ -89,6 +171,7 @@ class PreferenceGenerator {
         return MethodSpec.methodBuilder(methodName)
                 .addModifiers(PUBLIC)
                 .returns(TypeName.BOOLEAN)
+                .addAnnotation(Override.class)
                 .addParameter(stringType, "key")
                 .addParameter(valueTypeName, "value")
                 .addStatement("SharedPreferences.Editor editor = $N.edit()", preferencesName)
@@ -104,6 +187,7 @@ class PreferenceGenerator {
         return MethodSpec.methodBuilder(methodName)
                 .addModifiers(PUBLIC)
                 .returns(valueTypeName)
+                .addAnnotation(Override.class)
                 .addParameter(TypeName.get(String.class), "key")
                 .addParameter(valueTypeName, "defValue")
                 .addStatement("return $N.$N(key, defValue)", preferencesName, methodName)
@@ -116,6 +200,7 @@ class PreferenceGenerator {
     private MethodSpec createRemoveAndClearImplMethod(boolean isRemove) {
         MethodSpec.Builder builder = MethodSpec.methodBuilder(isRemove ? "remove" : "clear")
                 .addModifiers(PUBLIC)
+                .addAnnotation(Override.class)
                 .returns(TypeName.BOOLEAN);
         if (isRemove) {
             builder.addParameter(TypeName.get(String.class), "key");
@@ -133,6 +218,7 @@ class PreferenceGenerator {
     private MethodSpec createContainsImplMethod() {
         return MethodSpec.methodBuilder("contains")
                 .addModifiers(PUBLIC)
+                .addAnnotation(Override.class)
                 .returns(TypeName.BOOLEAN)
                 .addParameter(TypeName.get(String.class), "key")
                 .addStatement("return $N.contains(key)", preferencesName)
@@ -151,18 +237,25 @@ class PreferenceGenerator {
             TypeName typeName = field.getTypeName();
             String typeNameString = field.getTypeStringName();
 
-            //put
             String putMethodName = "put" + fieldName;
             String putAsyncMethodName = "put" + fieldName + "Async";
             String putMethodImplName = "put" + typeNameString;
+
+            String getMethodName = "get" + fieldName;
+            String getAsyncMethodName = "get" + fieldName + "Async";
+            String getMethodImplName = "get" + typeNameString;
+
+            //put
             MethodSpec putMethodSpec = MethodSpec.methodBuilder(putMethodName)
                     .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
                     .addParameter(typeName, "value", FINAL)
                     .addStatement("$N(\"$N\", value)", putMethodImplName, fieldName.toUpperCase())
                     .build();
 
             MethodSpec putAsyncMethodSpec = MethodSpec.methodBuilder(putAsyncMethodName)
                     .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
                     .addParameter(typeName, "value", FINAL)
                     .addCode("getExecutor().execute(new Runnable() {\n")
                     .addCode("    @Override\n")
@@ -173,9 +266,6 @@ class PreferenceGenerator {
                     .build();
 
             //get
-            String getMethodName = "get" + fieldName;
-            String getAsyncMethodName = "get" + fieldName + "Async";
-            String getMethodImplName = "get" + typeNameString;
             //get 有 defValue
             MethodSpec.Builder getMethodDefBuilder = MethodSpec.methodBuilder(getMethodName).addModifiers(PUBLIC);
             createGetMethodSpec(getMethodDefBuilder, typeName, getMethodImplName, fieldName, true);
@@ -220,7 +310,7 @@ class PreferenceGenerator {
     /**
      * 创建FileDataBase实现类
      */
-    void createDataBaseImpl(Filer filer) throws IOException {
+    void createDataBaseImpl() throws IOException {
         if (markInfo == null || "".equals(markInfo.markClassName)) {
             return;
         }
@@ -235,7 +325,7 @@ class PreferenceGenerator {
                 .addMethods(methodSpecs)
                 .build();
         JavaFile javaFile = JavaFile.builder(mEntityClass.getPackageName(), typeSpec).build();
-        javaFile.writeTo(filer);
+        javaFile.writeTo(mFiler);
     }
 
     /**
@@ -274,7 +364,7 @@ class PreferenceGenerator {
                     .addCode("            $T sharedPreferences = getCreateHelper().getContext()\n", getSharedPreferences())
                     .addStatement("                    .getSharedPreferences(\"$N\", $T.MODE_PRIVATE)", mEntityClass.getSpFileName(),
                             ClassName.get("android.content", "Context"))
-                    .addStatement("            $N = new $N(sharedPreferences)", fieldName, fieldInfo.fieldTypeName.toString())
+                    .addStatement("            $N = new $N(sharedPreferences)", fieldName, fieldInfo.fieldTypeName.toString() + IMPL_SUFFIX)
                     .addCode("        }\n")
                     .addStatement("        return $N", fieldName)
                     .addCode("    }\n")
@@ -291,6 +381,7 @@ class PreferenceGenerator {
     private void createGetMethodSpec(MethodSpec.Builder builder, TypeName typeName,
                                      String getMethodImplName, String fieldName, boolean hasDef) {
         fieldName = fieldName.toUpperCase();
+        builder.addAnnotation(Override.class);
         builder.returns(typeName);
         if (hasDef) {
             builder.addParameter(typeName, "defValue");
@@ -307,9 +398,9 @@ class PreferenceGenerator {
      */
     private void createGetMethodSpecAsync(MethodSpec.Builder builder, TypeName typeName, String getMethodImplName,
                                           String fieldName, boolean hasDef) {
-        ClassName callback = ClassName.get(getPackageName(), "OnPreferenceCallBack");
         fieldName = fieldName.toUpperCase();
-        builder.addParameter(callback, "callBack", Modifier.FINAL);
+        builder.addAnnotation(Override.class);
+        builder.addParameter(getPreferenceCallBack(), "callBack", Modifier.FINAL);
         if (hasDef) {
             builder.addParameter(typeName, "defValue", Modifier.FINAL);
         }
@@ -331,11 +422,15 @@ class PreferenceGenerator {
         return mEntityClass.getPackageName();
     }
 
-    private static String toUpperFirstChar(String str) {
+    public static String toUpperFirstChar(String str) {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
     private ClassName getSharedPreferences() {
         return ClassName.get("android.content", "SharedPreferences");
+    }
+
+    public ClassName getPreferenceCallBack() {
+        return ClassName.get(CODE_PACKAGE_NAME, "OnPreferenceCallBack");
     }
 }

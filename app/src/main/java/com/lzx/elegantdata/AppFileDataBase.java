@@ -13,7 +13,9 @@ import com.lzx.code.FileDataBase;
 @ElegantDataMark
 public abstract class AppFileDataBase extends FileDataBase {
 
-    public abstract PreferenceKeyInfo_Impl getPreferenceKeyInfo();
+    public abstract PreferenceKeyInfo getPreferenceKeyInfo();
+
+    public abstract KeyInfo getKeyInfo();
 
     private static AppFileDataBase INSTANCE;
     private static final Object sLock = new Object();

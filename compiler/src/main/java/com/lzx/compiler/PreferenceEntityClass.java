@@ -2,6 +2,7 @@ package com.lzx.compiler;
 
 import com.google.common.base.Strings;
 import com.google.common.base.VerifyException;
+import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.PreferenceEntity;
 import com.squareup.javapoet.TypeName;
 
@@ -44,27 +45,34 @@ public class PreferenceEntityClass {
         PreferenceEntity preferenceEntity = typeElement.getAnnotation(PreferenceEntity.class);
         //获取基本的类信息
         getBaseClassInfo(typeElement, preferenceEntity);
-
-        //存着变量的变量名
-        Map<String, String> checkKeyNameMap = new HashMap<>();
         //遍历类中的元素
         for (Element variable : typeElement.getEnclosedElements()) {
             //如果是变量
             if (variable instanceof VariableElement) {
                 VariableElement variableElement = (VariableElement) variable;
+                IgnoreField ignoreField = variableElement.getAnnotation(IgnoreField.class);
+
                 PreferenceEntityField entityField = new PreferenceEntityField(variableElement, mElements, messager);
-
                 //如果有重复的keyName,不允许
-                if (checkKeyNameMap.get(entityField.getKeyName()) != null) {
-                    throw new VerifyException(
-                            String.format("\'%s\' key is already used in class.", entityField.getKeyName()));
+                checkFieldValidity(entityField);
+                //过滤被IgnoreField修饰的变量
+                if (ignoreField == null) {
+                    keyFields.add(entityField);   //保存变量值
                 }
-
-                checkKeyNameMap.put(entityField.getKeyName(), entityField.getFieldName());
-                keyFields.add(entityField);
             }
         }
+    }
 
+    /**
+     * 如果有重复的keyName,不允许
+     */
+    private void checkFieldValidity(PreferenceEntityField entityField) {
+        Map<String, String> checkKeyNameMap = new HashMap<>();
+        if (checkKeyNameMap.get(entityField.getKeyName()) != null) {
+            throw new VerifyException(
+                    String.format("\'%s\' key is already used in class.", entityField.getKeyName()));
+        }
+        checkKeyNameMap.put(entityField.getKeyName(), entityField.getFieldName());
     }
 
     /**
@@ -80,7 +88,7 @@ public class PreferenceEntityClass {
         clazzName = typeElement.getSimpleName().toString();
         //获取PreferenceEntity注解上的值
         spFileName = Strings.isNullOrEmpty(preferenceEntity.fileName())
-                ? clazzName.toUpperCase()+"_preferences" : preferenceEntity.fileName();
+                ? clazzName.toUpperCase() + "_preferences" : preferenceEntity.fileName();
     }
 
     public String getPackageName() {

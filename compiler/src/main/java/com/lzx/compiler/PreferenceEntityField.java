@@ -92,6 +92,7 @@ public class PreferenceEntityField {
             }
         }
 
+        //过滤被 IgnoreField 修饰的变量
         if (!hasIgnoreField) {
             //不允许 private 修饰变量
             if (variableElement.getModifiers().contains(Modifier.PRIVATE)) {
