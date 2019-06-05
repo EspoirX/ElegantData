@@ -19,7 +19,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
 
 /**
- * PreferenceEntity 对类信息获取的封装
+ * @PreferenceEntity 信息封装
  * create by lzx
  * 2019-05-29
  */
@@ -27,8 +27,6 @@ public class PreferenceEntityClass {
 
     private TypeElement mTypeElement;
     private Elements mElements;
-    private Messager mMessager;
-
     private String packageName;
     private TypeName typeName;
     private String clazzName;
@@ -36,10 +34,9 @@ public class PreferenceEntityClass {
 
     private List<PreferenceEntityField> keyFields;
 
-    public PreferenceEntityClass(TypeElement typeElement, Elements elements, Messager messager) throws IllegalAccessException {
+    PreferenceEntityClass(TypeElement typeElement, Elements elements) throws IllegalAccessException {
         mTypeElement = typeElement;
         mElements = elements;
-        mMessager = messager;
         keyFields = new ArrayList<>();
 
         PreferenceEntity preferenceEntity = typeElement.getAnnotation(PreferenceEntity.class);
@@ -52,7 +49,7 @@ public class PreferenceEntityClass {
                 VariableElement variableElement = (VariableElement) variable;
                 IgnoreField ignoreField = variableElement.getAnnotation(IgnoreField.class);
 
-                PreferenceEntityField entityField = new PreferenceEntityField(variableElement, mElements, messager);
+                PreferenceEntityField entityField = new PreferenceEntityField(variableElement, mElements);
                 //如果有重复的keyName,不允许
                 checkFieldValidity(entityField);
                 //过滤被IgnoreField修饰的变量
@@ -91,23 +88,23 @@ public class PreferenceEntityClass {
                 ? clazzName.toUpperCase() + "_preferences" : preferenceEntity.fileName();
     }
 
-    public String getPackageName() {
+    String getPackageName() {
         return packageName;
     }
 
-    public TypeName getTypeName() {
+    TypeName getTypeName() {
         return typeName;
     }
 
-    public String getClazzName() {
+    String getClazzName() {
         return clazzName;
     }
 
-    public List<PreferenceEntityField> getKeyFields() {
+    List<PreferenceEntityField> getKeyFields() {
         return keyFields;
     }
 
-    public String getSpFileName() {
+    String getSpFileName() {
         return spFileName;
     }
 

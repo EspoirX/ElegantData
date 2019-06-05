@@ -2,13 +2,12 @@ package com.lzx.compiler;
 
 import com.google.auto.service.AutoService;
 import com.lzx.annoation.ElegantDataMark;
-import com.lzx.annoation.Embedded;
+import com.lzx.annoation.EntityClass;
 import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.NameField;
 import com.lzx.annoation.PreferenceEntity;
 import com.squareup.javapoet.TypeName;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -25,10 +24,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import javax.tools.Diagnostic;
 
 import static javax.tools.Diagnostic.Kind.ERROR;
 
@@ -53,7 +50,7 @@ public class PreferenceProcessor extends AbstractProcessor {
         Set<String> supportedTypes = new HashSet<>();
         supportedTypes.add(PreferenceEntity.class.getCanonicalName());
         supportedTypes.add(IgnoreField.class.getCanonicalName());
-        supportedTypes.add(Embedded.class.getCanonicalName());
+        supportedTypes.add(EntityClass.class.getCanonicalName());
         supportedTypes.add(NameField.class.getCanonicalName());
         return supportedTypes;
     }
@@ -65,6 +62,7 @@ public class PreferenceProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        //解析@ElegantDataMark
         Set<? extends Element> markElementSet = roundEnv.getElementsAnnotatedWith(ElegantDataMark.class);
         if (markElementSet.size() == 0) {
             return false;
@@ -72,14 +70,37 @@ public class PreferenceProcessor extends AbstractProcessor {
         if (markElementSet.size() > 1) {
             throw new RuntimeException("Can only mark one @ElegantDataMark");
         }
+        //获取ElegantDataMarkInfo
+        ElegantDataMarkInfo markInfo = getElegantDataMarkInfo(markElementSet);
+        //解析@PreferenceEntity
+        Set<? extends Element> preferenceElementSet = roundEnv.getElementsAnnotatedWith(PreferenceEntity.class);
+        List<PreferenceEntityClass> entityClassList = getPreferenceEntityClassList(preferenceElementSet);
+        //创建被 @ElegantDataMark 标记的抽象类的实现类
+        MarkImplGenerator fileDataImplGenerator = new MarkImplGenerator(entityClassList, mFiler, markInfo);
+        fileDataImplGenerator.createElegantDataMarkImpl();
+        //创建被 @PreferenceEntity 标记的实现类
+        for (PreferenceEntityClass entityClass : entityClassList) {
+            createPreferenceEntityImpl(markInfo, entityClass);
+        }
+        return false;
+    }
+
+
+    /**
+     * 获取ElegantDataMarkInfo
+     */
+    private ElegantDataMarkInfo getElegantDataMarkInfo(Set<? extends Element> markElementSet) {
         ElegantDataMarkInfo markInfo = null;
         for (Element element : markElementSet) {
             TypeElement type = (TypeElement) element;
-
+            try {
+                checkValidElegantDataMarkType(type);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
             markInfo = new ElegantDataMarkInfo();
             markInfo.markClassName = type.getSimpleName().toString();
             List<ElegantDataMarkInfo.FieldInfo> fieldInfos = new ArrayList<>();
-
             for (Element variable : type.getEnclosedElements()) {
                 if (variable.getKind() == ElementKind.METHOD) {
                     ElegantDataMarkInfo.FieldInfo info = new ElegantDataMarkInfo.FieldInfo();
@@ -96,38 +117,44 @@ public class PreferenceProcessor extends AbstractProcessor {
             }
             markInfo.mFieldInfos = fieldInfos;
         }
-        //返回所有被注解了@PreferenceEntity的元素的列表
-        Set<? extends Element> preferenceElementSet = roundEnv.getElementsAnnotatedWith(PreferenceEntity.class);
+        return markInfo;
+    }
 
+    /**
+     * 获取List<PreferenceEntityClass>
+     */
+    private List<PreferenceEntityClass> getPreferenceEntityClassList(Set<? extends Element> preferenceElementSet) {
         List<PreferenceEntityClass> entityClassList = new ArrayList<>();
         for (Element element : preferenceElementSet) {
-            //类信息
             TypeElement type = (TypeElement) element;
             try {
-                //检查类信息
-                checkValidEntityType(type);
-                PreferenceEntityClass entityClass = new PreferenceEntityClass(type, mElements, mMessager);
+                checkValidPreferenceEntityType(type);   //检查类信息
+                PreferenceEntityClass entityClass = new PreferenceEntityClass(type, mElements);
                 entityClassList.add(entityClass);
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
         }
-
-        for (PreferenceEntityClass entityClass : entityClassList) {
-            //解析注解
-            generatePreferenceInjector(entityClass, markInfo);
-        }
-
-        return false;
+        return entityClassList;
     }
 
     /**
-     * 检查合法性
-     * 1. PreferenceEntity只能加在类上面
-     * 2. 类不能有 final 修饰
-     * 3. 类不能有 private 修饰
+     * 创建被 @PreferenceEntity 标记的实现类
      */
-    private void checkValidEntityType(TypeElement annotatedType) throws IllegalAccessException {
+    private void createPreferenceEntityImpl(ElegantDataMarkInfo markInfo, PreferenceEntityClass entityClass) {
+        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements, mFiler, markInfo);
+        try {
+            generator.createPreferenceDaoInterface();
+            generator.createPreferenceDaoImpl();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 检查@PreferenceEntity合法性
+     */
+    private void checkValidPreferenceEntityType(TypeElement annotatedType) throws IllegalAccessException {
         if (!annotatedType.getKind().isInterface()) {
             throw new IllegalAccessException("Only Interface can be annotated with @PreferenceEntity");
         } else if (annotatedType.getModifiers().contains(Modifier.FINAL)) {
@@ -137,24 +164,20 @@ public class PreferenceProcessor extends AbstractProcessor {
         }
     }
 
-    private void generatePreferenceInjector(PreferenceEntityClass entityClass, ElegantDataMarkInfo markInfo) {
-        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements, mFiler, markInfo);
-        try {
-            generator.createPreferenceDaoInterface();
-            generator.createPreferenceDaoImpl();
-            generator.createDataBaseImpl();
-        } catch (Exception e) {
-            e.printStackTrace();
+    /**
+     * 检查@ElegantDataMark合法性
+     */
+    private void checkValidElegantDataMarkType(TypeElement annotatedType) throws IllegalAccessException {
+        if (!annotatedType.getKind().isClass()) {
+            throw new IllegalAccessException("Only Class can be annotated with @ElegantDataMark");
+        } else if (!annotatedType.getModifiers().contains(Modifier.ABSTRACT)) {
+            showErrorLog("class modifier should be abstract", annotatedType);
+        } else if (annotatedType.getModifiers().contains(Modifier.PRIVATE)) {
+            showErrorLog("class modifier should not be private", annotatedType);
         }
     }
 
-
     private void showErrorLog(String message, Element element) {
         mMessager.printMessage(ERROR, "Error:" + message, element);
-    }
-
-
-    private void showLog(String message) {
-        mMessager.printMessage(Diagnostic.Kind.NOTE, message);
     }
 }

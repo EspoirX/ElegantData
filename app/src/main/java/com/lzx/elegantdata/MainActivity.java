@@ -13,12 +13,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        AppFileDataBase.withSp(this).getKeyInfo().putWidth(100);
+        User user = new User();
+        user.like = "吃屎";
 
-        String name = AppFileDataBase.withSp(this).getPreferenceKeyInfo().getName();
-        long age = AppFileDataBase.withSp(this).getKeyInfo().getWidth();
-        Toast.makeText(this, "name = " + name, Toast.LENGTH_SHORT).show();
-        Log.i("xian", "name = " + name + " age = " + age);
+        AppFileDataBase.withSp(this).getKeyInfo().putUser(user);
+
+        User user1 = AppFileDataBase.withFile(this).getKeyInfo().getUser();
+
+        Log.i("xian", "User = " + user1.like);
 
     }
 }

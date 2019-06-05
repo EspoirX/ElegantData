@@ -3,6 +3,7 @@ package com.lzx.elegantdata;
 import android.content.Context;
 
 import com.lzx.annoation.ElegantDataMark;
+import com.lzx.annoation.PreferenceEntity;
 import com.lzx.code.ElegantData;
 import com.lzx.code.FileDataBase;
 

@@ -7,9 +7,10 @@ import java.lang.annotation.Target;
 
 /**
  * create by lzx
- * 2019-06-04
+ * 2019-05-29
  */
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.SOURCE)
-public @interface ElegantDataMark {
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD})
+public @interface EntityClass {
+
 }
