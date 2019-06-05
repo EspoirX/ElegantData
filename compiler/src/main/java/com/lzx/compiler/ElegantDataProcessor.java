@@ -5,7 +5,7 @@ import com.lzx.annoation.ElegantDataMark;
 import com.lzx.annoation.EntityClass;
 import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.NameField;
-import com.lzx.annoation.PreferenceEntity;
+import com.lzx.annoation.ElegantEntity;
 import com.squareup.javapoet.TypeName;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ import javax.lang.model.util.Elements;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 @AutoService(Processor.class)
-public class PreferenceProcessor extends AbstractProcessor {
+public class ElegantDataProcessor extends AbstractProcessor {
 
     private Filer mFiler;
     private Elements mElements;
@@ -48,7 +48,7 @@ public class PreferenceProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         Set<String> supportedTypes = new HashSet<>();
-        supportedTypes.add(PreferenceEntity.class.getCanonicalName());
+        supportedTypes.add(ElegantEntity.class.getCanonicalName());
         supportedTypes.add(IgnoreField.class.getCanonicalName());
         supportedTypes.add(EntityClass.class.getCanonicalName());
         supportedTypes.add(NameField.class.getCanonicalName());
@@ -73,18 +73,21 @@ public class PreferenceProcessor extends AbstractProcessor {
         //获取ElegantDataMarkInfo
         ElegantDataMarkInfo markInfo = getElegantDataMarkInfo(markElementSet);
         //解析@PreferenceEntity
-        Set<? extends Element> preferenceElementSet = roundEnv.getElementsAnnotatedWith(PreferenceEntity.class);
-        List<PreferenceEntityClass> entityClassList = getPreferenceEntityClassList(preferenceElementSet);
+        Set<? extends Element> preferenceElementSet = roundEnv.getElementsAnnotatedWith(ElegantEntity.class);
+        List<AnnotationEntityClass> entityClassList = getPreferenceEntityClassList(preferenceElementSet);
         //创建被 @ElegantDataMark 标记的抽象类的实现类
         MarkImplGenerator fileDataImplGenerator = new MarkImplGenerator(entityClassList, mFiler, markInfo);
         fileDataImplGenerator.createElegantDataMarkImpl();
         //创建被 @PreferenceEntity 标记的实现类
-        for (PreferenceEntityClass entityClass : entityClassList) {
-            createPreferenceEntityImpl(entityClass);
+        for (AnnotationEntityClass entityClass : entityClassList) {
+            if (entityClass.getFileType() == ElegantEntity.TYPE_PREFERENCE) {
+                createPreferenceEntityImpl(entityClass);
+            } else if (entityClass.getFileType() == ElegantEntity.TYPE_FILE) {
+                createFileEntityImpl(entityClass);
+            }
         }
         return false;
     }
-
 
     /**
      * 获取ElegantDataMarkInfo
@@ -123,13 +126,13 @@ public class PreferenceProcessor extends AbstractProcessor {
     /**
      * 获取List<PreferenceEntityClass>
      */
-    private List<PreferenceEntityClass> getPreferenceEntityClassList(Set<? extends Element> preferenceElementSet) {
-        List<PreferenceEntityClass> entityClassList = new ArrayList<>();
+    private List<AnnotationEntityClass> getPreferenceEntityClassList(Set<? extends Element> preferenceElementSet) {
+        List<AnnotationEntityClass> entityClassList = new ArrayList<>();
         for (Element element : preferenceElementSet) {
             TypeElement type = (TypeElement) element;
             try {
                 checkValidPreferenceEntityType(type);   //检查类信息
-                PreferenceEntityClass entityClass = new PreferenceEntityClass(type, mElements);
+                AnnotationEntityClass entityClass = new AnnotationEntityClass(type, mElements);
                 entityClassList.add(entityClass);
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
@@ -141,11 +144,21 @@ public class PreferenceProcessor extends AbstractProcessor {
     /**
      * 创建被 @PreferenceEntity 标记的实现类
      */
-    private void createPreferenceEntityImpl(PreferenceEntityClass entityClass) {
-        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mFiler);
+    private void createPreferenceEntityImpl(AnnotationEntityClass entityClass) {
+        ElegantDataGenerator generator = new ElegantDataGenerator(entityClass, mFiler);
         try {
             generator.createPreferenceDaoInterface();
             generator.createPreferenceDaoImpl();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void createFileEntityImpl(AnnotationEntityClass entityClass) {
+        ElegantDataGenerator generator = new ElegantDataGenerator(entityClass, mFiler);
+        try {
+            generator.createFileDaoInterface();
+            generator.createFileDaoImpl();
         } catch (Exception e) {
             e.printStackTrace();
         }

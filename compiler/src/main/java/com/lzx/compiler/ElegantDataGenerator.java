@@ -1,7 +1,5 @@
 package com.lzx.compiler;
 
-import com.google.common.base.CaseFormat;
-import com.google.common.base.Strings;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
@@ -14,7 +12,6 @@ import java.util.List;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.util.Elements;
 
 import static javax.lang.model.element.Modifier.ABSTRACT;
 import static javax.lang.model.element.Modifier.FINAL;
@@ -26,17 +23,17 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  * create by lzx
  * 2019-05-30
  */
-class PreferenceGenerator {
+class ElegantDataGenerator {
 
     private static final String preferencesName = "mPreferences";
-    private PreferenceEntityClass mEntityClass;
+    private AnnotationEntityClass mEntityClass;
 
     private String[] putArray;
     private String[] getArray;
     private TypeName[] typeNameArray;
     private Filer mFiler;
 
-    PreferenceGenerator(PreferenceEntityClass entityClass, Filer filer) {
+    ElegantDataGenerator(AnnotationEntityClass entityClass, Filer filer) {
         mEntityClass = entityClass;
         mFiler = filer;
         putArray = new String[]{"putString", "putInt", "putLong", "putFloat", "putBoolean"};
@@ -50,21 +47,15 @@ class PreferenceGenerator {
      */
     void createPreferenceDaoInterface() throws IOException {
         List<MethodSpec> methodSpecs = new ArrayList<>();
-        List<PreferenceEntityField> fieldList = mEntityClass.getKeyFields();
-        for (PreferenceEntityField field : fieldList) {
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField field : fieldList) {
             String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
             TypeName typeName = field.getTypeName();
             String putMethodName = "put" + fieldName;
-            String putAsyncMethodName = "put" + fieldName + "Async";
             String getMethodName = "get" + fieldName;
-            String getAsyncMethodName = "get" + fieldName + "Async";
             String removeMethodName = "remove" + fieldName;
             String containsMethodName = "contains" + fieldName;
             methodSpecs.add(MethodSpec.methodBuilder(putMethodName)
-                    .addModifiers(ABSTRACT, PUBLIC)
-                    .addParameter(typeName, "value")
-                    .build());
-            methodSpecs.add(MethodSpec.methodBuilder(putAsyncMethodName)
                     .addModifiers(ABSTRACT, PUBLIC)
                     .addParameter(typeName, "value")
                     .build());
@@ -78,16 +69,7 @@ class PreferenceGenerator {
                         .addParameter(typeName, "defValue")
                         .returns(typeName)
                         .build());
-                methodSpecs.add(MethodSpec.methodBuilder(getAsyncMethodName)
-                        .addModifiers(ABSTRACT, PUBLIC)
-                        .addParameter(getDataCallBack(), "callBack")
-                        .addParameter(typeName, "defValue")
-                        .build());
             }
-            methodSpecs.add(MethodSpec.methodBuilder(getAsyncMethodName)
-                    .addModifiers(ABSTRACT, PUBLIC)
-                    .addParameter(getDataCallBack(), "callBack")
-                    .build());
             methodSpecs.add(MethodSpec.methodBuilder(removeMethodName)
                     .addModifiers(ABSTRACT, PUBLIC)
                     .returns(TypeName.BOOLEAN)
@@ -109,6 +91,10 @@ class PreferenceGenerator {
         javaFile.writeTo(mFiler);
     }
 
+    void createFileDaoInterface() throws IOException {
+        createPreferenceDaoInterface();
+    }
+
     /**
      * 创建Dao实现类
      */
@@ -117,7 +103,6 @@ class PreferenceGenerator {
         methodSpecs.add(MethodSpec.constructorBuilder()
                 .addParameter(GeneratorHelper.getSharedPreferences(), "sharedPreferences")
                 .addStatement("$N = sharedPreferences", preferencesName)
-                .addStatement("mDispatcher = new DataDispatcher()")
                 .build());
         methodSpecs.addAll(createPutAndGetMethod());
         methodSpecs.addAll(createObjectPutAndGet());
@@ -135,18 +120,168 @@ class PreferenceGenerator {
         methodSpecs.add(createRemoveAndClearImplMethod(true));
         methodSpecs.add(createRemoveAndClearImplMethod(false));
         methodSpecs.add(createContainsImplMethod());
-        //创建getExecutor
-        methodSpecs.add(createExecutor());
 
         TypeSpec typeSpec = TypeSpec.classBuilder(mEntityClass.getClazzName() + GeneratorHelper.IMPL_SUFFIX)
                 .addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(mEntityClass.getTypeName())
                 .addField(GeneratorHelper.getSharedPreferences(), preferencesName, Modifier.PRIVATE)
-                .addField(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "DataDispatcher"), "mDispatcher", PRIVATE)
                 .addMethods(methodSpecs)
                 .build();
         JavaFile javaFile = JavaFile.builder(mEntityClass.getPackageName(), typeSpec).build();
         javaFile.writeTo(mFiler);
+    }
+
+    void createFileDaoImpl() throws IOException {
+        ClassName folderCreateHelper = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "IFolderCreateHelper");
+        List<MethodSpec> methodSpecs = new ArrayList<>();
+        methodSpecs.add(MethodSpec.constructorBuilder()
+                .addParameter(folderCreateHelper, "createHelper")
+                .addModifiers(PUBLIC)
+                .addStatement("this.createHelper = createHelper")
+                .addStatement("folder = this.createHelper.getFileDirectoryPath()")
+                .build());
+        methodSpecs.add(createWriteDataToFile());
+        methodSpecs.add(createReadDataFromFile());
+        //创建put
+        for (int i = 0; i < putArray.length; i++) {
+            methodSpecs.add(createFilePutImplMethod(putArray[i], typeNameArray[i]));
+        }
+        //创建get
+        for (int i = 0; i < getArray.length; i++) {
+            methodSpecs.add(createFileGetImplMethod(getArray[i], typeNameArray[i]));
+        }
+        TypeSpec typeSpec = TypeSpec.classBuilder(mEntityClass.getClazzName() + GeneratorHelper.IMPL_SUFFIX)
+                .addModifiers(Modifier.PUBLIC)
+                .addSuperinterface(mEntityClass.getTypeName())
+                .addField(folderCreateHelper, "createHelper")
+                .addField(TypeName.get(String.class), "folder")
+                .addMethods(methodSpecs)
+                .build();
+        JavaFile javaFile = JavaFile.builder(mEntityClass.getPackageName(), typeSpec).build();
+        javaFile.writeTo(mFiler);
+    }
+
+
+    private MethodSpec createWriteDataToFile() {
+        TypeName stringType = TypeName.get(String.class);
+        return MethodSpec.methodBuilder("writeDataToFile")
+                .addModifiers(PRIVATE)
+                .addParameter(stringType, "folder")
+                .addParameter(stringType, "fileName")
+                .addParameter(stringType, "data")
+                .addStatement("$T writer = null", getIOClass("BufferedWriter"))
+                .addStatement("$T fileWriter = null", getIOClass("FileWriter"))
+                .addCode("try {\n")
+                .addStatement("$T newFile = new File(folder, fileName)", getIOClass("File"))
+                .addStatement("fileWriter = new FileWriter(newFile, false)")
+                .addStatement("writer = new $T(fileWriter)", getIOClass("BufferedWriter"))
+                .addStatement("writer.write(data)")
+                .addStatement("writer.flush()")
+                .addCode("} catch ($T e) {\n", getIOClass("FileNotFoundException"))
+                .addStatement("e.printStackTrace()")
+                .addCode("} catch ($T e) {\n", getIOClass("IOException"))
+                .addStatement("e.printStackTrace()")
+                .addCode("} finally {\n")
+                .addCode("if (writer != null) {\n")
+                .addCode("try {\n")
+                .addStatement("fileWriter.close()")
+                .addStatement("writer.close()")
+                .addCode("} catch (IOException e) {\n")
+                .addStatement("e.printStackTrace()")
+                .addCode("}\n")
+                .addCode("}\n")
+                .addCode("}\n")
+                .build();
+    }
+
+    private MethodSpec createReadDataFromFile() {
+        TypeName stringType = TypeName.get(String.class);
+        return MethodSpec.methodBuilder("readDataFromFile")
+                .addModifiers(PRIVATE)
+                .addParameter(stringType, "folder")
+                .addParameter(stringType, "fileName")
+                .returns(stringType)
+                .addStatement("StringBuilder stringBuilder = new StringBuilder()")
+                .addStatement("$T reader", getIOClass("BufferedReader"))
+                .addStatement("$T fileReader", getIOClass("FileReader"))
+                .addStatement("File file = new File(folder, fileName)")
+                .addCode("try {\n")
+                .addStatement("fileReader = new FileReader(file)")
+                .addStatement("reader = new BufferedReader(fileReader)")
+                .addStatement("String line")
+                .addCode("while ((line = reader.readLine()) != null) {\n")
+                .addStatement("stringBuilder.append(line)")
+                .addCode("}\n")
+                .addStatement("return stringBuilder.toString()")
+                .addCode("} catch (FileNotFoundException e) {\n")
+                .addStatement("e.printStackTrace()")
+                .addCode("} catch (IOException e) {\n")
+                .addStatement("e.printStackTrace()")
+                .addCode("}\n")
+                .addStatement("return stringBuilder.toString()")
+                .build();
+    }
+
+    private List<MethodSpec> createFilePutAndGetMethod() {
+        List<MethodSpec> methodSpecList = new ArrayList<>();
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField field : fieldList) {
+            if (field.isObjectField()) {
+                continue;
+            }
+            String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
+            TypeName typeName = field.getTypeName();
+            String typeNameString = field.getTypeStringName();
+            String putMethodName = "put" + fieldName;
+            String putMethodImplName = "put" + typeNameString;
+            String getMethodName = "get" + fieldName;
+            String getMethodImplName = "get" + typeNameString;
+
+
+        }
+        return methodSpecList;
+    }
+
+    private MethodSpec createFileGetImplMethod(String methodName, TypeName valueTypeName) {
+        TypeName stringType = TypeName.get(String.class);
+        String returnCode = valueTypeName.equals(TypeName.BOOLEAN)
+                ? "return false;"
+                : (valueTypeName.equals(stringType) ? "return \"\";\n" : "return 0;");
+        TypeName returnType = valueTypeName.equals(TypeName.FLOAT) ? TypeName.DOUBLE : valueTypeName;
+        String realMethod = methodName.equals("getFloat") ? "getDouble" : methodName;
+        return MethodSpec.methodBuilder(realMethod)
+                .addModifiers(PRIVATE)
+                .addParameter(stringType, "key")
+                .returns(returnType)
+                .addCode("try {\n")
+                .addStatement("String data = readDataFromFile(folder, \"$N\")", mEntityClass.getFileName())
+                .addStatement("String json = AESEncryption.decrypt(data, \"\", \"1234567890ABCDFG\")")
+                .addStatement("JSONObject object = new JSONObject(json)")
+                .addStatement("return object.$N(key)", realMethod)
+                .addCode("} catch (JSONException e) {\n")
+                .addCode(" e.printStackTrace();\n")
+                .addCode("}\n")
+                .addCode(returnCode)
+                .build();
+    }
+
+    private MethodSpec createFilePutImplMethod(String methodName, TypeName valueTypeName) {
+        TypeName stringType = TypeName.get(String.class);
+        ClassName encryptionClazz = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "AESEncryption");
+        String realMethod = methodName.equals("putFloat") ? "putDouble" : methodName;
+        return MethodSpec.methodBuilder(realMethod)
+                .addModifiers(PRIVATE)
+                .addParameter(stringType, "key")
+                .addParameter(valueTypeName, "value")
+                .addCode("try {\n")
+                .addStatement("$T object = new JSONObject()", ClassName.get("org.json", "JSONObject"))
+                .addStatement("object.put(\"key\", value)")
+                .addStatement("String json = $T.encrypt(object.toString(), \"1234567890ABCDFG\")", encryptionClazz)
+                .addStatement("writeDataToFile(folder, \"$N\", json)", mEntityClass.getFileName())
+                .addCode("} catch ($T e) {\n", ClassName.get("org.json", "JSONException"))
+                .addStatement("e.printStackTrace()")
+                .addCode("}")
+                .build();
     }
 
     /**
@@ -214,9 +349,9 @@ class PreferenceGenerator {
      */
     private List<MethodSpec> createPutAndGetMethod() {
         List<MethodSpec> methodSpecList = new ArrayList<>();
-        List<PreferenceEntityField> fieldList = mEntityClass.getKeyFields();
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
 
-        for (PreferenceEntityField field : fieldList) {
+        for (AnnotationEntityField field : fieldList) {
             if (field.isObjectField()) {
                 continue;
             }
@@ -225,11 +360,9 @@ class PreferenceGenerator {
             String typeNameString = field.getTypeStringName();
 
             String putMethodName = "put" + fieldName;
-            String putAsyncMethodName = "put" + fieldName + "Async";
             String putMethodImplName = "put" + typeNameString;
 
             String getMethodName = "get" + fieldName;
-            String getAsyncMethodName = "get" + fieldName + "Async";
             String getMethodImplName = "get" + typeNameString;
             //put
             MethodSpec putMethodSpec = MethodSpec.methodBuilder(putMethodName)
@@ -238,44 +371,18 @@ class PreferenceGenerator {
                     .addParameter(typeName, "value", FINAL)
                     .addStatement("$N(\"$N\", value)", putMethodImplName, fieldName.toUpperCase())
                     .build();
-            MethodSpec putAsyncMethodSpec = MethodSpec.methodBuilder(putAsyncMethodName)
-                    .addModifiers(PUBLIC)
-                    .addAnnotation(Override.class)
-                    .addParameter(typeName, "value", FINAL)
-                    .addCode("getExecutor().execute(new Runnable() {\n")
-                    .addCode("    @Override\n")
-                    .addCode("    public void run() {\n")
-                    .addStatement("$N(\"$N\", value)", putMethodImplName, fieldName.toUpperCase())
-                    .addCode("    }\n")
-                    .addStatement("})")
-                    .build();
-
-            //get
             //get 有 defValue
             MethodSpec.Builder getMethodDefBuilder = MethodSpec.methodBuilder(getMethodName).addModifiers(PUBLIC);
             createGetMethodSpec(getMethodDefBuilder, typeName, getMethodImplName, fieldName, true);
             MethodSpec getMethodDef = getMethodDefBuilder.build();
-
             //get 没 defValue
             MethodSpec.Builder getMethodBuilder = MethodSpec.methodBuilder(getMethodName).addModifiers(Modifier.PUBLIC);
             createGetMethodSpec(getMethodBuilder, typeName, getMethodImplName, fieldName, false);
             MethodSpec getMethod = getMethodBuilder.build();
 
-            //get 异步有 defValue
-            MethodSpec.Builder getAsyncBuilderDef = MethodSpec.methodBuilder(getAsyncMethodName).addModifiers(Modifier.PUBLIC);
-            createGetMethodSpecAsync(getAsyncBuilderDef, typeName, getMethodImplName, fieldName, true);
-            MethodSpec getAsyncMethodDef = getAsyncBuilderDef.build();
-            //get 异步没 defValue
-            MethodSpec.Builder getAsyncBuilder = MethodSpec.methodBuilder(getAsyncMethodName).addModifiers(Modifier.PUBLIC);
-            createGetMethodSpecAsync(getAsyncBuilder, typeName, getMethodImplName, fieldName, false);
-            MethodSpec getAsyncMethod = getAsyncBuilder.build();
-
             methodSpecList.add(putMethodSpec);
-            methodSpecList.add(putAsyncMethodSpec);
             methodSpecList.add(getMethodDef);
             methodSpecList.add(getMethod);
-            methodSpecList.add(getAsyncMethodDef);
-            methodSpecList.add(getAsyncMethod);
         }
         return methodSpecList;
     }
@@ -285,20 +392,16 @@ class PreferenceGenerator {
      */
     private List<MethodSpec> createObjectPutAndGet() {
         List<MethodSpec> methodSpecs = new ArrayList<>();
-        List<PreferenceEntityField> fieldList = mEntityClass.getKeyFields();
-        for (PreferenceEntityField keyField : fieldList) {
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField keyField : fieldList) {
             if (keyField.isObjectField()) {
                 ClassName converterClazz = ClassName.get(keyField.getConverterPackage(), keyField.getConverter());
                 ClassName encryptionClazz = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "AESEncryption");
                 String typeName = keyField.getTypeName().box().toString();
 
-                System.out.println("converterClazz = " + converterClazz + "  getConverter = " + keyField.getConverter() + " typeName = " + typeName);
-
                 String upperKeyName = GeneratorHelper.toUpperFirstChar(keyField.getKeyName());
                 String putMethodName = "put" + upperKeyName;
-                String putAsyncMethodName = putMethodName + "Async";
                 String getMethodName = "get" + upperKeyName;
-                String getAsyncMethodName = getMethodName + "Async";
 
                 methodSpecs.add(MethodSpec.methodBuilder(putMethodName)
                         .addAnnotation(Override.class)
@@ -308,17 +411,6 @@ class PreferenceGenerator {
                         .addStatement("String json = parser.convertObject($N)", keyField.getKeyName())
                         .addStatement("putString(\"$N\",$T.encrypt(json,\"1234567890ABCDFG\"))",
                                 keyField.getKeyName().toUpperCase(), encryptionClazz)
-                        .build());
-                methodSpecs.add(MethodSpec.methodBuilder(putAsyncMethodName)
-                        .addAnnotation(Override.class)
-                        .addModifiers(PUBLIC)
-                        .addParameter(keyField.getTypeName(), keyField.getKeyName(), FINAL)
-                        .addCode("    getExecutor().execute(new Runnable() {\n")
-                        .addCode("        @Override\n")
-                        .addCode("        public void run() {\n")
-                        .addStatement("$N($N)", putMethodName, keyField.getKeyName())
-                        .addCode("        }\n")
-                        .addCode("    });\n")
                         .build());
                 methodSpecs.add(MethodSpec.methodBuilder(getMethodName)
                         .addAnnotation(Override.class)
@@ -337,18 +429,6 @@ class PreferenceGenerator {
                         .addCode("}\n")
                         .addStatement("return new $T()", keyField.getTypeName())
                         .build());
-                methodSpecs.add(MethodSpec.methodBuilder(getAsyncMethodName)
-                        .addAnnotation(Override.class)
-                        .addModifiers(PUBLIC)
-                        .addParameter(getDataCallBack(), "callBack", FINAL)
-                        .addCode("    getExecutor().execute(new Runnable() {\n")
-                        .addCode("        @Override\n")
-                        .addCode("        public void run() {\n")
-                        .addStatement("$T value = $N()", keyField.getTypeName(), getMethodName)
-                        .addStatement("callBack.onSuccess(value)")
-                        .addCode("        }\n")
-                        .addCode("    });\n")
-                        .build());
             }
         }
         return methodSpecs;
@@ -356,8 +436,8 @@ class PreferenceGenerator {
 
     private List<MethodSpec> createRemoveAndContains() {
         List<MethodSpec> methodSpecs = new ArrayList<>();
-        List<PreferenceEntityField> fieldList = mEntityClass.getKeyFields();
-        for (PreferenceEntityField field : fieldList) {
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField field : fieldList) {
             String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
             String removeMethodName = "remove" + fieldName;
             String containsMethodName = "contains" + fieldName;
@@ -378,18 +458,6 @@ class PreferenceGenerator {
     }
 
     /**
-     * 创建获取线程池内部方法
-     */
-    private MethodSpec createExecutor() {
-        ClassName executorService = ClassName.get("java.util.concurrent", "ExecutorService");
-        return MethodSpec.methodBuilder("getExecutor")
-                .addModifiers(Modifier.PRIVATE)
-                .returns(executorService)
-                .addStatement("return mDispatcher.executorService()")
-                .build();
-    }
-
-    /**
      * 创建get同步方法
      */
     private void createGetMethodSpec(MethodSpec.Builder builder, TypeName typeName,
@@ -407,32 +475,11 @@ class PreferenceGenerator {
         );
     }
 
-    /**
-     * 创建get异步步方法
-     */
-    private void createGetMethodSpecAsync(MethodSpec.Builder builder, TypeName typeName, String getMethodImplName,
-                                          String fieldName, boolean hasDef) {
-        fieldName = fieldName.toUpperCase();
-        builder.addAnnotation(Override.class);
-        builder.addParameter(getDataCallBack(), "callBack", Modifier.FINAL);
-        if (hasDef) {
-            builder.addParameter(typeName, "defValue", Modifier.FINAL);
-        }
-        builder.addCode("getExecutor().execute(new Runnable() {\n");
-        builder.addCode("            @Override\n");
-        builder.addCode("            public void run() {\n");
-        builder.addStatement("$N value = $N(\"$N\", $N)", typeName.toString(), getMethodImplName, fieldName,
-                hasDef ? "defValue" : (GeneratorHelper.isEqualsString(typeName) ? "\"\"" : "0"));
-        builder.addCode("                callBack.onSuccess(value);\n");
-        builder.addCode("            }\n");
-        builder.addStatement("        })");
-    }
-
     private String getPackageName() {
         return mEntityClass.getPackageName();
     }
 
-    private ClassName getDataCallBack() {
-        return ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "OnDataCallBack");
+    private ClassName getIOClass(String simpleName) {
+        return ClassName.get("java.io", simpleName);
     }
 }

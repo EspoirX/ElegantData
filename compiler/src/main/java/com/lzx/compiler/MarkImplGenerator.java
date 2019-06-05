@@ -1,10 +1,10 @@
 package com.lzx.compiler;
 
+import com.lzx.annoation.ElegantEntity;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
@@ -15,33 +15,27 @@ import java.util.Map;
 
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.util.Elements;
-
-import static javax.lang.model.element.Modifier.ABSTRACT;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PUBLIC;
 
 /**
- *  创建被 @ElegantDataMark 标记的抽象类的实体类
+ * 创建被 @ElegantDataMark 标记的抽象类的实体类
  * create by lzx
  * 2019-05-30
  */
 class MarkImplGenerator {
 
-    private List<PreferenceEntityClass> mEntityClassList;
+    private List<AnnotationEntityClass> mEntityClassList;
     private ElegantDataMarkInfo markInfo;
     private Filer mFiler;
-    private Map<String, String> spFileNameMap = new HashMap<>();
+    private Map<String, String> fileNameMap = new HashMap<>();
     private String packageName;
 
-    MarkImplGenerator(List<PreferenceEntityClass> entityClassList, Filer filer, ElegantDataMarkInfo markInfo) {
+    MarkImplGenerator(List<AnnotationEntityClass> entityClassList, Filer filer, ElegantDataMarkInfo markInfo) {
         mEntityClassList = entityClassList;
         mFiler = filer;
         this.markInfo = markInfo;
-        for (PreferenceEntityClass entityClass : entityClassList) {
+        for (AnnotationEntityClass entityClass : entityClassList) {
             packageName = entityClass.getPackageName();
-            spFileNameMap.put(entityClass.getClazzName(), entityClass.getSpFileName());
+            fileNameMap.put(entityClass.getClazzName(), entityClass.getFileName());
         }
     }
 
@@ -57,7 +51,9 @@ class MarkImplGenerator {
         }
         List<FieldSpec> fieldSpecs = new ArrayList<>();
         List<MethodSpec> methodSpecs = new ArrayList<>();
+
         createFieldsAndMethods(fieldSpecs, methodSpecs);
+
         TypeSpec typeSpec = TypeSpec.classBuilder(markInfo.markClassName + GeneratorHelper.IMPL_SUFFIX)
                 .addModifiers(Modifier.PUBLIC)
                 .superclass(ClassName.get(packageName, markInfo.markClassName))
@@ -89,7 +85,9 @@ class MarkImplGenerator {
     private void createFieldsAndMethods(List<FieldSpec> fieldSpecs, List<MethodSpec> methodSpecs) {
         for (int i = 0; i < markInfo.mFieldInfos.size(); i++) {
             ElegantDataMarkInfo.FieldInfo fieldInfo = markInfo.mFieldInfos.get(i);
-            String spFileName = spFileNameMap.get(fieldInfo.getFieldTypeNameString());
+            AnnotationEntityClass entityClass = mEntityClassList.get(i);
+
+            String spFileName = fileNameMap.get(fieldInfo.getFieldTypeNameString());
 
             String fieldName = fieldInfo.fieldName;
             if (fieldName.contains("get")) {
@@ -100,29 +98,48 @@ class MarkImplGenerator {
                     FieldSpec
                             .builder(fieldTypeName, fieldName, Modifier.PRIVATE)
                             .build());
-            methodSpecs.add(MethodSpec.methodBuilder(fieldInfo.fieldName)
-                    .addAnnotation(Override.class)
-                    .addModifiers(Modifier.PUBLIC)
-                    .returns(fieldTypeName)
-                    .addCode("if ($N != null) {\n", fieldName)
-                    .addStatement("    return $N", fieldName)
-                    .addCode("} else {\n")
-                    .addCode("    synchronized (this) {\n")
-                    .addCode("        if ($N == null) {\n", fieldName)
-                    .addCode("            $T sharedPreferences = getCreateHelper().getContext()\n", GeneratorHelper.getSharedPreferences())
-                    .addStatement("                    .getSharedPreferences(\"$N\", $T.MODE_PRIVATE)", spFileName,
-                            ClassName.get("android.content", "Context"))
-                    .addStatement("            $N = new $N(sharedPreferences)", fieldName,
-                            fieldInfo.getFieldTypeNameString() + GeneratorHelper.IMPL_SUFFIX)
-                    .addCode("        }\n")
-                    .addStatement("        return $N", fieldName)
-                    .addCode("    }\n")
-                    .addCode("}")
-                    .build()
-            );
+            if (entityClass.getFileType() == ElegantEntity.TYPE_PREFERENCE) {
+                methodSpecs.add(MethodSpec.methodBuilder(fieldInfo.fieldName)
+                        .addAnnotation(Override.class)
+                        .addModifiers(Modifier.PUBLIC)
+                        .returns(fieldTypeName)
+                        .addCode("if ($N != null) {\n", fieldName)
+                        .addStatement("    return $N", fieldName)
+                        .addCode("} else {\n")
+                        .addCode("    synchronized (this) {\n")
+                        .addCode("        if ($N == null) {\n", fieldName)
+                        .addCode("            $T sharedPreferences = getCreateHelper().getContext()\n", GeneratorHelper.getSharedPreferences())
+                        .addStatement("                    .getSharedPreferences(\"$N\", $T.MODE_PRIVATE)", spFileName,
+                                ClassName.get("android.content", "Context"))
+                        .addStatement("            $N = new $N(sharedPreferences)", fieldName,
+                                fieldInfo.getFieldTypeNameString() + GeneratorHelper.IMPL_SUFFIX)
+                        .addCode("        }\n")
+                        .addStatement("        return $N", fieldName)
+                        .addCode("    }\n")
+                        .addCode("}")
+                        .build()
+                );
+            } else if (entityClass.getFileType() == ElegantEntity.TYPE_FILE) {
+                methodSpecs.add(MethodSpec.methodBuilder(fieldInfo.fieldName)
+                        .addAnnotation(Override.class)
+                        .addModifiers(Modifier.PUBLIC)
+                        .returns(fieldTypeName)
+                        .addCode("if ($N != null) {\n", fieldName)
+                        .addStatement("    return $N", fieldName)
+                        .addCode("} else {\n")
+                        .addCode("    synchronized (this) {\n")
+                        .addCode("        if ($N == null) {\n", fieldName)
+                        .addStatement("IFolderCreateHelper createHelper = getCreateHelper()")
+                        .addStatement("            $N = new $N(createHelper)", fieldName,
+                                fieldInfo.getFieldTypeNameString() + GeneratorHelper.IMPL_SUFFIX)
+                        .addCode("        }\n")
+                        .addStatement("        return $N", fieldName)
+                        .addCode("    }\n")
+                        .addCode("}")
+                        .build());
+            }
         }
     }
-
 
 
 }

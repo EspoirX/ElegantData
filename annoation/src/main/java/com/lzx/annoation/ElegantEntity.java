@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Stack;
 
 /**
  * create by lzx
@@ -11,9 +12,16 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
-public @interface PreferenceEntity {
+public @interface ElegantEntity {
+
+    int TYPE_PREFERENCE = 0;
+    int TYPE_FILE = 1;
+
     /**
      * 文件名
      */
-    String fileName() default "default_sp_file";
+    String fileName() default "";
+
+    int fileType() default TYPE_PREFERENCE;
+
 }
