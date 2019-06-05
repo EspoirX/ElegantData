@@ -3,22 +3,20 @@ package com.lzx.code;
 import android.content.Context;
 import android.support.annotation.NonNull;
 
-import com.lzx.annoation.PreferenceEntity;
-
 /**
  * create by lzx
  * 2019-05-28
  */
 public class ElegantData {
 
-    public static <T extends FileDataBase> FileDataBase.Builder<T> preferenceBuilder(
+    public static <T extends ElegantDataBase> ElegantDataBase.Builder<T> preferenceBuilder(
             @NonNull Context context, @NonNull Class<T> klass) {
-        return new FileDataBase.Builder<>(klass, "", context);
+        return new ElegantDataBase.Builder<>(klass, "", context);
     }
 
-    public static <T extends FileDataBase> FileDataBase.Builder<T> fileBuilder(
+    public static <T extends ElegantDataBase> ElegantDataBase.Builder<T> fileBuilder(
             @NonNull Context context, String destFileDir, @NonNull Class<T> klass) {
-        return new FileDataBase.Builder<>(klass, destFileDir, context);
+        return new ElegantDataBase.Builder<>(klass, destFileDir, context);
     }
 
 

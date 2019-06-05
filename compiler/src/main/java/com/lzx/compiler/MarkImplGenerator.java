@@ -80,8 +80,8 @@ class MarkImplGenerator {
         return MethodSpec.methodBuilder("createDataFolderHelper")
                 .addModifiers(Modifier.PROTECTED)
                 .addAnnotation(Override.class)
-                .addParameter(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "FileConfiguration"), "configuration")
-                .returns(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "SupportFolderCreateHelper"))
+                .addParameter(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "Configuration"), "configuration")
+                .returns(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "IFolderCreateHelper"))
                 .addStatement("return configuration.mFactory.create(configuration.context, configuration.destFileDir)")
                 .build();
     }

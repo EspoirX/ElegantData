@@ -9,11 +9,11 @@ import java.io.File;
  * create by lzx
  * 2019-06-03
  */
-public class DataFolderCreateHelper implements SupportFolderCreateHelper {
+public class FolderCreateHelper implements IFolderCreateHelper {
 
     private CreateHelper mDelegate;
 
-    DataFolderCreateHelper(Context context, String destFileDir) {
+    FolderCreateHelper(Context context, String destFileDir) {
         mDelegate = new CreateHelper(context, destFileDir);
     }
 

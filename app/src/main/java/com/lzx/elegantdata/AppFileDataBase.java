@@ -3,16 +3,15 @@ package com.lzx.elegantdata;
 import android.content.Context;
 
 import com.lzx.annoation.ElegantDataMark;
-import com.lzx.annoation.PreferenceEntity;
 import com.lzx.code.ElegantData;
-import com.lzx.code.FileDataBase;
+import com.lzx.code.ElegantDataBase;
 
 /**
  * create by lzx
  * 2019-06-03
  */
 @ElegantDataMark
-public abstract class AppFileDataBase extends FileDataBase {
+public abstract class AppFileDataBase extends ElegantDataBase {
 
     public abstract PreferenceKeyInfo getPreferenceKeyInfo();
 

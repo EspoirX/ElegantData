@@ -16,10 +16,6 @@ public class DataDispatcher {
     public DataDispatcher() {
     }
 
-    public DataDispatcher(ExecutorService executorService) {
-        this.executorService = executorService;
-    }
-
     public synchronized ExecutorService executorService() {
         if (executorService == null) {
             executorService = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,

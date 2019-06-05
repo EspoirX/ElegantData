@@ -48,7 +48,6 @@ public class PreferenceEntityClass {
             if (variable instanceof VariableElement) {
                 VariableElement variableElement = (VariableElement) variable;
                 IgnoreField ignoreField = variableElement.getAnnotation(IgnoreField.class);
-
                 PreferenceEntityField entityField = new PreferenceEntityField(variableElement, mElements);
                 //如果有重复的keyName,不允许
                 checkFieldValidity(entityField);

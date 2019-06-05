@@ -107,7 +107,7 @@ public class PreferenceEntityField {
             this.typeStringName = "Long";
         } else if (this.typeName.equals(TypeName.get(String.class))) {
             this.typeStringName = "String";
-        } else {
+        }  else {
             // 如果不是基础类型，则是 object 类型，判断有没有被 EntityClass 和 IgnoreField 标记
             if (!hasEntityClass && !hasIgnoreField) {
                 throw new IllegalAccessException(

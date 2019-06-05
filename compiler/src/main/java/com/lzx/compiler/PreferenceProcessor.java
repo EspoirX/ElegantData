@@ -80,7 +80,7 @@ public class PreferenceProcessor extends AbstractProcessor {
         fileDataImplGenerator.createElegantDataMarkImpl();
         //创建被 @PreferenceEntity 标记的实现类
         for (PreferenceEntityClass entityClass : entityClassList) {
-            createPreferenceEntityImpl(markInfo, entityClass);
+            createPreferenceEntityImpl(entityClass);
         }
         return false;
     }
@@ -141,8 +141,8 @@ public class PreferenceProcessor extends AbstractProcessor {
     /**
      * 创建被 @PreferenceEntity 标记的实现类
      */
-    private void createPreferenceEntityImpl(ElegantDataMarkInfo markInfo, PreferenceEntityClass entityClass) {
-        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mElements, mFiler, markInfo);
+    private void createPreferenceEntityImpl(PreferenceEntityClass entityClass) {
+        PreferenceGenerator generator = new PreferenceGenerator(entityClass, mFiler);
         try {
             generator.createPreferenceDaoInterface();
             generator.createPreferenceDaoImpl();
