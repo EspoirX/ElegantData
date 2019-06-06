@@ -1,7 +1,6 @@
 package com.lzx.compiler;
 
 import com.google.common.base.Strings;
-import com.lzx.annoation.EntityClass;
 import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.NameField;
 import com.squareup.javapoet.ClassName;
@@ -41,7 +40,7 @@ public class AnnotationEntityField {
         mVariableElement = variableElement;
         mElements = elements;
         IgnoreField ignoreField = variableElement.getAnnotation(IgnoreField.class);
-        EntityClass entityClass = variableElement.getAnnotation(EntityClass.class);
+        ClassName entityClass = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "EntityClass");
         NameField nameField = variableElement.getAnnotation(NameField.class);
 
         hasIgnoreField = ignoreField != null;
@@ -67,7 +66,7 @@ public class AnnotationEntityField {
             for (AnnotationMirror annotationMirror : list) {
                 TypeName mirrorTypeName = TypeName.get(annotationMirror.getAnnotationType());
 
-                if (mirrorTypeName.equals(ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "TypeConverter"))) {
+                if (mirrorTypeName.equals(entityClass)) {
                     //返回此注释元素的值。此值是以映射的形式返回的，该映射将元素与其相应的值关联。
                     // 只包括那些注释中明确存在其值的元素，不包括那些隐式假定其默认值的元素。
                     // 映射的顺序与值出现在注释源中的顺序匹配。

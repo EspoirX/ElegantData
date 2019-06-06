@@ -43,7 +43,7 @@ class ElegantDataGenerator {
     }
 
     /**
-     * 创建Dao接口类
+     * 创建 sp 文件 Dao接口类
      */
     void createPreferenceDaoInterface() throws IOException {
         List<MethodSpec> methodSpecs = new ArrayList<>();
@@ -91,35 +91,18 @@ class ElegantDataGenerator {
         javaFile.writeTo(mFiler);
     }
 
+    /**
+     * 创建 file 文件 Dao接口类
+     */
     void createFileDaoInterface() throws IOException {
         createPreferenceDaoInterface();
     }
 
     /**
-     * 创建Dao实现类
+     * 创建 sp 文件 Dao实现类
      */
     void createPreferenceDaoImpl() throws IOException {
-        List<MethodSpec> methodSpecs = new ArrayList<>();
-        methodSpecs.add(MethodSpec.constructorBuilder()
-                .addParameter(GeneratorHelper.getSharedPreferences(), "sharedPreferences")
-                .addStatement("$N = sharedPreferences", preferencesName)
-                .build());
-        methodSpecs.addAll(createPutAndGetMethod());
-        methodSpecs.addAll(createObjectPutAndGet());
-        methodSpecs.addAll(createRemoveAndContains());
-
-        //创建put
-        for (int i = 0; i < putArray.length; i++) {
-            methodSpecs.add(createPutImplMethod(putArray[i], typeNameArray[i]));
-        }
-        //创建get
-        for (int i = 0; i < getArray.length; i++) {
-            methodSpecs.add(createGetImplMethod(getArray[i], typeNameArray[i]));
-        }
-        //创建remove,clear,contains
-        methodSpecs.add(createRemoveAndClearImplMethod(true));
-        methodSpecs.add(createRemoveAndClearImplMethod(false));
-        methodSpecs.add(createContainsImplMethod());
+        List<MethodSpec> methodSpecs = createSPMethods();
 
         TypeSpec typeSpec = TypeSpec.classBuilder(mEntityClass.getClazzName() + GeneratorHelper.IMPL_SUFFIX)
                 .addModifiers(Modifier.PUBLIC)
@@ -131,36 +114,139 @@ class ElegantDataGenerator {
         javaFile.writeTo(mFiler);
     }
 
+    /**
+     * 创建 file 文件 Dao实现类
+     */
     void createFileDaoImpl() throws IOException {
         ClassName folderCreateHelper = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "IFolderCreateHelper");
-        List<MethodSpec> methodSpecs = new ArrayList<>();
-        methodSpecs.add(MethodSpec.constructorBuilder()
-                .addParameter(folderCreateHelper, "createHelper")
-                .addModifiers(PUBLIC)
-                .addStatement("this.createHelper = createHelper")
-                .addStatement("folder = this.createHelper.getFileDirectoryPath()")
-                .build());
-        methodSpecs.add(createWriteDataToFile());
-        methodSpecs.add(createReadDataFromFile());
-        //创建put
-        for (int i = 0; i < putArray.length; i++) {
-            methodSpecs.add(createFilePutImplMethod(putArray[i], typeNameArray[i]));
-        }
-        //创建get
-        for (int i = 0; i < getArray.length; i++) {
-            methodSpecs.add(createFileGetImplMethod(getArray[i], typeNameArray[i]));
-        }
         TypeSpec typeSpec = TypeSpec.classBuilder(mEntityClass.getClazzName() + GeneratorHelper.IMPL_SUFFIX)
                 .addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(mEntityClass.getTypeName())
                 .addField(folderCreateHelper, "createHelper")
                 .addField(TypeName.get(String.class), "folder")
-                .addMethods(methodSpecs)
+                .addMethods(createFileMethods(folderCreateHelper))
                 .build();
         JavaFile javaFile = JavaFile.builder(mEntityClass.getPackageName(), typeSpec).build();
         javaFile.writeTo(mFiler);
     }
 
+    //-----------------------------------file文件方法------------------------------------------------
+
+    private List<MethodSpec> createFileMethods(ClassName folderCreateHelper) {
+        List<MethodSpec> methodSpecList = new ArrayList<>();
+        //构造方法
+        methodSpecList.add(MethodSpec.constructorBuilder()
+                .addParameter(folderCreateHelper, "createHelper")
+                .addModifiers(PUBLIC)
+                .addStatement("this.createHelper = createHelper")
+                .addStatement("folder = this.createHelper.getFileDirectoryPath()")
+                .build());
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField field : fieldList) {
+            if (field.isObjectField()) {
+                continue;
+            }
+            String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
+            TypeName typeName = field.getTypeName();
+            String typeNameString = field.getTypeStringName();
+            String returnCode = typeName.equals(TypeName.get(String.class)) ? "\"\"" : "0";
+            //putXXX 方法
+            methodSpecList.add(MethodSpec.methodBuilder("put" + fieldName)
+                    .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
+                    .addParameter(typeName, "value", FINAL)
+                    .addStatement("put$N(\"$N\",value)", typeNameString, fieldName.toUpperCase())
+                    .build());
+            //getXXX 方法
+            methodSpecList.add(MethodSpec.methodBuilder("get" + fieldName)
+                    .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
+                    .returns(typeName)
+                    .addStatement("return get$N(\"$N\")", typeNameString, fieldName.toUpperCase())
+                    .build());
+            //getXXX(defValue) 方法
+            methodSpecList.add(MethodSpec.methodBuilder("get" + fieldName)
+                    .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
+                    .addParameter(typeName, "defValue")
+                    .returns(typeName)
+                    .addStatement("return get$N() == $N ? defValue : get$N()", fieldName, returnCode, fieldName)
+                    .build());
+            //removeXXX 方法
+            methodSpecList.add(MethodSpec.methodBuilder("remove" + fieldName)
+                    .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
+                    .returns(TypeName.BOOLEAN)
+                    .addStatement("return remove(\"$N\")", fieldName.toUpperCase())
+                    .build());
+            //containsXXX 方法
+            methodSpecList.add(MethodSpec.methodBuilder("contains" + fieldName)
+                    .addModifiers(PUBLIC)
+                    .addAnnotation(Override.class)
+                    .returns(TypeName.BOOLEAN)
+                    .addStatement("return contains(\"$N\")", fieldName.toUpperCase())
+                    .build());
+        }
+        // getObject，putObject，removeObject，containsObject
+        methodSpecList.addAll(createFileObjectMethods());
+        //writeDataToFile
+        methodSpecList.add(createWriteDataToFile());
+        //readDataFromFile
+        methodSpecList.add(createReadDataFromFile());
+        //创建put封装方法
+        for (int i = 0; i < putArray.length; i++) {
+            methodSpecList.add(createFilePutImplMethod(putArray[i], typeNameArray[i]));
+        }
+        //创建get封装方法
+        for (int i = 0; i < getArray.length; i++) {
+            methodSpecList.add(createFileGetImplMethod(getArray[i], typeNameArray[i]));
+        }
+        //创建remove封装方法
+        methodSpecList.add(MethodSpec.methodBuilder("remove")
+                .addModifiers(PRIVATE)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(TypeName.get(String.class), "key")
+                .addCode("try {\n")
+                .addStatement("String data = readDataFromFile(folder, \"$N\")", mEntityClass.getFileName())
+                .addStatement("String json = AESEncryption.decrypt(data, \"\", \"1234567890ABCDFG\")")
+                .addStatement("JSONObject object = new JSONObject(json)")
+                .addStatement("object.remove(key)")
+                .addStatement("String newJson = AESEncryption.encrypt(object.toString(), \"1234567890ABCDFG\")")
+                .addStatement("writeDataToFile(folder, \"$N\", newJson)", mEntityClass.getFileName())
+                .addStatement("return true")
+                .addCode("} catch (JSONException e) {\n")
+                .addStatement("e.printStackTrace()")
+                .addStatement("return false")
+                .addCode("}\n")
+                .build());
+        //创建contains封装方法
+        methodSpecList.add(MethodSpec.methodBuilder("contains")
+                .addModifiers(PRIVATE)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(TypeName.get(String.class), "key")
+                .addCode("try {\n")
+                .addStatement("String data = readDataFromFile(folder, \"$N\")", mEntityClass.getFileName())
+                .addStatement("String json = AESEncryption.decrypt(data, \"\", \"1234567890ABCDFG\")")
+                .addStatement("JSONObject object = new JSONObject(json)")
+                .addStatement("return object.has(key)")
+                .addCode("} catch (JSONException e) {\n")
+                .addStatement("e.printStackTrace()")
+                .addStatement("return false")
+                .addCode("}\n")
+                .build());
+        //创建clear方法
+        methodSpecList.add(MethodSpec.methodBuilder("clear")
+                .addModifiers(PUBLIC)
+                .addAnnotation(Override.class)
+                .returns(TypeName.BOOLEAN)
+                .addStatement("File newFile = new File(folder, \"$N\")", mEntityClass.getFileName())
+                .addCode("if (newFile.exists()) {\n")
+                .addStatement("return newFile.delete()")
+                .addCode("}\n")
+                .addStatement("return false")
+                .build());
+        return methodSpecList;
+    }
 
     private MethodSpec createWriteDataToFile() {
         TypeName stringType = TypeName.get(String.class);
@@ -205,6 +291,7 @@ class ElegantDataGenerator {
                 .addStatement("$T reader", getIOClass("BufferedReader"))
                 .addStatement("$T fileReader", getIOClass("FileReader"))
                 .addStatement("File file = new File(folder, fileName)")
+                .addCode("if (!file.exists()) { return \"\"; }")
                 .addCode("try {\n")
                 .addStatement("fileReader = new FileReader(file)")
                 .addStatement("reader = new BufferedReader(fileReader)")
@@ -222,26 +309,6 @@ class ElegantDataGenerator {
                 .build();
     }
 
-    private List<MethodSpec> createFilePutAndGetMethod() {
-        List<MethodSpec> methodSpecList = new ArrayList<>();
-        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
-        for (AnnotationEntityField field : fieldList) {
-            if (field.isObjectField()) {
-                continue;
-            }
-            String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
-            TypeName typeName = field.getTypeName();
-            String typeNameString = field.getTypeStringName();
-            String putMethodName = "put" + fieldName;
-            String putMethodImplName = "put" + typeNameString;
-            String getMethodName = "get" + fieldName;
-            String getMethodImplName = "get" + typeNameString;
-
-
-        }
-        return methodSpecList;
-    }
-
     private MethodSpec createFileGetImplMethod(String methodName, TypeName valueTypeName) {
         TypeName stringType = TypeName.get(String.class);
         String returnCode = valueTypeName.equals(TypeName.BOOLEAN)
@@ -257,6 +324,7 @@ class ElegantDataGenerator {
                 .addStatement("String data = readDataFromFile(folder, \"$N\")", mEntityClass.getFileName())
                 .addStatement("String json = AESEncryption.decrypt(data, \"\", \"1234567890ABCDFG\")")
                 .addStatement("JSONObject object = new JSONObject(json)")
+                .addStatement("$T.i(\"xian\",\" string = \"+object.toString())", ClassName.get("android.util", "Log"))
                 .addStatement("return object.$N(key)", realMethod)
                 .addCode("} catch (JSONException e) {\n")
                 .addCode(" e.printStackTrace();\n")
@@ -267,90 +335,77 @@ class ElegantDataGenerator {
 
     private MethodSpec createFilePutImplMethod(String methodName, TypeName valueTypeName) {
         TypeName stringType = TypeName.get(String.class);
-        ClassName encryptionClazz = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "AESEncryption");
+        ClassName encryptionClazz = getEncryptionClazz();
         String realMethod = methodName.equals("putFloat") ? "putDouble" : methodName;
         return MethodSpec.methodBuilder(realMethod)
                 .addModifiers(PRIVATE)
                 .addParameter(stringType, "key")
                 .addParameter(valueTypeName, "value")
                 .addCode("try {\n")
-                .addStatement("$T object = new JSONObject()", ClassName.get("org.json", "JSONObject"))
-                .addStatement("object.put(\"key\", value)")
-                .addStatement("String json = $T.encrypt(object.toString(), \"1234567890ABCDFG\")", encryptionClazz)
-                .addStatement("writeDataToFile(folder, \"$N\", json)", mEntityClass.getFileName())
+                .addStatement("String data = readDataFromFile(folder, \"$N\")", mEntityClass.getFileName())
+                .addStatement("String json = AESEncryption.decrypt(data, \"{}\", \"1234567890ABCDFG\")")
+                .addStatement("$T object = new JSONObject(json)", ClassName.get("org.json", "JSONObject"))
+                .addStatement("object.put(key, value)")
+                .addStatement("String newJson = $T.encrypt(object.toString(), \"1234567890ABCDFG\")", encryptionClazz)
+                .addStatement("writeDataToFile(folder, \"$N\", newJson)", mEntityClass.getFileName())
+                .addStatement("$T.i(\"xian\",\"json = \"+newJson+\" string = \"+object.toString())", ClassName.get("android.util", "Log"))
                 .addCode("} catch ($T e) {\n", ClassName.get("org.json", "JSONException"))
                 .addStatement("e.printStackTrace()")
                 .addCode("}")
                 .build();
     }
 
-    /**
-     * 创建put封装方法
-     */
-    private MethodSpec createPutImplMethod(String methodName, TypeName valueTypeName) {
-        TypeName stringType = TypeName.get(String.class);
-        return MethodSpec.methodBuilder(methodName)
-                .addModifiers(PRIVATE)
-                .returns(TypeName.BOOLEAN)
-                .addParameter(stringType, "key")
-                .addParameter(valueTypeName, "value")
-                .addStatement("SharedPreferences.Editor editor = $N.edit()", preferencesName)
-                .addStatement("editor.$N(key, value)", methodName)
-                .addStatement("return editor.commit()")
-                .build();
-    }
-
-    /**
-     * 创建get封装方法
-     */
-    private MethodSpec createGetImplMethod(String methodName, TypeName valueTypeName) {
-        return MethodSpec.methodBuilder(methodName)
-                .addModifiers(PRIVATE)
-                .returns(valueTypeName)
-                .addParameter(TypeName.get(String.class), "key")
-                .addParameter(valueTypeName, "defValue")
-                .addStatement("return $N.$N(key, defValue)", preferencesName, methodName)
-                .build();
-    }
-
-    /**
-     * 创建remove 和 clear 封装方法
-     */
-    private MethodSpec createRemoveAndClearImplMethod(boolean isRemove) {
-        MethodSpec.Builder builder = MethodSpec.methodBuilder(isRemove ? "remove" : "clear").returns(TypeName.BOOLEAN);
-        if (isRemove) {
-            builder.addParameter(TypeName.get(String.class), "key");
-            builder.addModifiers(PRIVATE);
-        } else {
-            builder.addAnnotation(Override.class);
-            builder.addModifiers(PUBLIC);
-        }
-        builder
-                .addStatement("SharedPreferences.Editor editor = $N.edit()", preferencesName)
-                .addStatement(isRemove ? "editor.remove(key)" : "editor.clear()")
-                .addStatement("return editor.commit()");
-        return builder.build();
-    }
-
-    /**
-     * 创建contains方法 封装方法
-     */
-    private MethodSpec createContainsImplMethod() {
-        return MethodSpec.methodBuilder("contains")
-                .addModifiers(PRIVATE)
-                .returns(TypeName.BOOLEAN)
-                .addParameter(TypeName.get(String.class), "key")
-                .addStatement("return $N.contains(key)", preferencesName)
-                .build();
-    }
-
-    /**
-     * 创建 put 和 get 具体实现方法
-     */
-    private List<MethodSpec> createPutAndGetMethod() {
-        List<MethodSpec> methodSpecList = new ArrayList<>();
+    private List<MethodSpec> createFileObjectMethods() {
+        List<MethodSpec> methodSpecs = new ArrayList<>();
         List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        for (AnnotationEntityField keyField : fieldList) {
+            if (keyField.isObjectField()) {
+                ClassName converterClazz = ClassName.get(keyField.getConverterPackage(), keyField.getConverter());
+                String upperKeyName = GeneratorHelper.toUpperFirstChar(keyField.getKeyName());
+                String typeName = keyField.getTypeName().box().toString();
+                methodSpecs.add(MethodSpec.methodBuilder("put" + upperKeyName)
+                        .addAnnotation(Override.class)
+                        .addModifiers(PUBLIC)
+                        .addParameter(keyField.getTypeName(), "value")
+                        .addStatement("$T parser = new $N($N.class)", converterClazz, keyField.getConverter(), typeName)
+                        .addStatement("putString(\"$N\", parser.convertObject(value))", keyField.getKeyName().toUpperCase())
+                        .build());
+                methodSpecs.add(MethodSpec.methodBuilder("get" + upperKeyName)
+                        .addAnnotation(Override.class)
+                        .addModifiers(PUBLIC)
+                        .returns(keyField.getTypeName())
+                        .addStatement("String json = getString(\"$N\")", keyField.getKeyName().toUpperCase())
+                        .addStatement("$T parser = new $N($N.class)", converterClazz, keyField.getConverter(), typeName)
+                        .addStatement("return parser.onParse(json)")
+                        .build());
+                methodSpecs.add(MethodSpec.methodBuilder("remove" + upperKeyName)
+                        .addModifiers(PUBLIC)
+                        .addAnnotation(Override.class)
+                        .returns(TypeName.BOOLEAN)
+                        .addStatement("return remove(\"$N\")", keyField.getKeyName().toUpperCase())
+                        .build());
+                methodSpecs.add(MethodSpec.methodBuilder("contains" + upperKeyName)
+                        .addModifiers(PUBLIC)
+                        .addAnnotation(Override.class)
+                        .returns(TypeName.BOOLEAN)
+                        .addStatement("return contains(\"$N\")", keyField.getKeyName().toUpperCase())
+                        .build());
+            }
+        }
+        return methodSpecs;
+    }
 
+    //-----------------------------------sp文件方法--------------------------------------------------
+
+    private List<MethodSpec> createSPMethods() {
+        List<MethodSpec> methodSpecs = new ArrayList<>();
+        //构造方法
+        methodSpecs.add(MethodSpec.constructorBuilder()
+                .addParameter(GeneratorHelper.getSharedPreferences(), "sharedPreferences")
+                .addStatement("$N = sharedPreferences", preferencesName)
+                .build());
+        // getXXX 和 putXXX 方法
+        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
         for (AnnotationEntityField field : fieldList) {
             if (field.isObjectField()) {
                 continue;
@@ -358,52 +413,34 @@ class ElegantDataGenerator {
             String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
             TypeName typeName = field.getTypeName();
             String typeNameString = field.getTypeStringName();
-
-            String putMethodName = "put" + fieldName;
-            String putMethodImplName = "put" + typeNameString;
-
-            String getMethodName = "get" + fieldName;
-            String getMethodImplName = "get" + typeNameString;
             //put
-            MethodSpec putMethodSpec = MethodSpec.methodBuilder(putMethodName)
+            MethodSpec putMethodSpec = MethodSpec.methodBuilder("put" + fieldName)
                     .addModifiers(PUBLIC)
                     .addAnnotation(Override.class)
                     .addParameter(typeName, "value", FINAL)
-                    .addStatement("$N(\"$N\", value)", putMethodImplName, fieldName.toUpperCase())
+                    .addStatement("put$N(\"$N\", value)", typeNameString, fieldName.toUpperCase())
                     .build();
             //get 有 defValue
-            MethodSpec.Builder getMethodDefBuilder = MethodSpec.methodBuilder(getMethodName).addModifiers(PUBLIC);
-            createGetMethodSpec(getMethodDefBuilder, typeName, getMethodImplName, fieldName, true);
+            MethodSpec.Builder getMethodDefBuilder = MethodSpec.methodBuilder("get" + fieldName).addModifiers(PUBLIC);
+            createSPGetMethodSpec(getMethodDefBuilder, typeName, "get" + typeNameString, fieldName, true);
             MethodSpec getMethodDef = getMethodDefBuilder.build();
             //get 没 defValue
-            MethodSpec.Builder getMethodBuilder = MethodSpec.methodBuilder(getMethodName).addModifiers(Modifier.PUBLIC);
-            createGetMethodSpec(getMethodBuilder, typeName, getMethodImplName, fieldName, false);
+            MethodSpec.Builder getMethodBuilder = MethodSpec.methodBuilder("get" + fieldName).addModifiers(Modifier.PUBLIC);
+            createSPGetMethodSpec(getMethodBuilder, typeName, "get" + typeNameString, fieldName, false);
             MethodSpec getMethod = getMethodBuilder.build();
 
-            methodSpecList.add(putMethodSpec);
-            methodSpecList.add(getMethodDef);
-            methodSpecList.add(getMethod);
+            methodSpecs.add(putMethodSpec);
+            methodSpecs.add(getMethodDef);
+            methodSpecs.add(getMethod);
         }
-        return methodSpecList;
-    }
-
-    /**
-     * 创建 Object 方法
-     */
-    private List<MethodSpec> createObjectPutAndGet() {
-        List<MethodSpec> methodSpecs = new ArrayList<>();
-        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        // getObject 和 putObject 方法
         for (AnnotationEntityField keyField : fieldList) {
             if (keyField.isObjectField()) {
                 ClassName converterClazz = ClassName.get(keyField.getConverterPackage(), keyField.getConverter());
-                ClassName encryptionClazz = ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "AESEncryption");
+                ClassName encryptionClazz = getEncryptionClazz();
                 String typeName = keyField.getTypeName().box().toString();
-
                 String upperKeyName = GeneratorHelper.toUpperFirstChar(keyField.getKeyName());
-                String putMethodName = "put" + upperKeyName;
-                String getMethodName = "get" + upperKeyName;
-
-                methodSpecs.add(MethodSpec.methodBuilder(putMethodName)
+                methodSpecs.add(MethodSpec.methodBuilder("put" + upperKeyName)
                         .addAnnotation(Override.class)
                         .addModifiers(PUBLIC)
                         .addParameter(keyField.getTypeName(), keyField.getKeyName())
@@ -412,7 +449,7 @@ class ElegantDataGenerator {
                         .addStatement("putString(\"$N\",$T.encrypt(json,\"1234567890ABCDFG\"))",
                                 keyField.getKeyName().toUpperCase(), encryptionClazz)
                         .build());
-                methodSpecs.add(MethodSpec.methodBuilder(getMethodName)
+                methodSpecs.add(MethodSpec.methodBuilder("get" + upperKeyName)
                         .addAnnotation(Override.class)
                         .addModifiers(PUBLIC)
                         .returns(keyField.getTypeName())
@@ -431,12 +468,7 @@ class ElegantDataGenerator {
                         .build());
             }
         }
-        return methodSpecs;
-    }
-
-    private List<MethodSpec> createRemoveAndContains() {
-        List<MethodSpec> methodSpecs = new ArrayList<>();
-        List<AnnotationEntityField> fieldList = mEntityClass.getKeyFields();
+        //removeXXX 和 containsXXX 方法
         for (AnnotationEntityField field : fieldList) {
             String fieldName = GeneratorHelper.toUpperFirstChar(field.getKeyName());
             String removeMethodName = "remove" + fieldName;
@@ -454,14 +486,76 @@ class ElegantDataGenerator {
                     .addStatement("return contains(\"$N\")", fieldName.toUpperCase())
                     .build());
         }
+
+        //创建putXXX封装方法
+        for (int i = 0; i < putArray.length; i++) {
+            methodSpecs.add(createSPPutImplMethod(putArray[i], typeNameArray[i]));
+        }
+        //创建getXXX封装方法
+        for (int i = 0; i < getArray.length; i++) {
+            methodSpecs.add(createSPGetImplMethod(getArray[i], typeNameArray[i]));
+        }
+        //创建remove,clear,contains封装方法
+        methodSpecs.add(createSPRemoveAndClearImplMethod(true));
+        methodSpecs.add(createSPRemoveAndClearImplMethod(false));
+        methodSpecs.add(createSPContainsImplMethod());
         return methodSpecs;
     }
 
-    /**
-     * 创建get同步方法
-     */
-    private void createGetMethodSpec(MethodSpec.Builder builder, TypeName typeName,
-                                     String getMethodImplName, String fieldName, boolean hasDef) {
+    private ClassName getEncryptionClazz() {
+        return ClassName.get(GeneratorHelper.CODE_PACKAGE_NAME, "AESEncryption");
+    }
+
+    private MethodSpec createSPPutImplMethod(String methodName, TypeName valueTypeName) {
+        TypeName stringType = TypeName.get(String.class);
+        return MethodSpec.methodBuilder(methodName)
+                .addModifiers(PRIVATE)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(stringType, "key")
+                .addParameter(valueTypeName, "value")
+                .addStatement("SharedPreferences.Editor editor = $N.edit()", preferencesName)
+                .addStatement("editor.$N(key, value)", methodName)
+                .addStatement("return editor.commit()")
+                .build();
+    }
+
+    private MethodSpec createSPGetImplMethod(String methodName, TypeName valueTypeName) {
+        return MethodSpec.methodBuilder(methodName)
+                .addModifiers(PRIVATE)
+                .returns(valueTypeName)
+                .addParameter(TypeName.get(String.class), "key")
+                .addParameter(valueTypeName, "defValue")
+                .addStatement("return $N.$N(key, defValue)", preferencesName, methodName)
+                .build();
+    }
+
+    private MethodSpec createSPRemoveAndClearImplMethod(boolean isRemove) {
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(isRemove ? "remove" : "clear").returns(TypeName.BOOLEAN);
+        if (isRemove) {
+            builder.addParameter(TypeName.get(String.class), "key");
+            builder.addModifiers(PRIVATE);
+        } else {
+            builder.addAnnotation(Override.class);
+            builder.addModifiers(PUBLIC);
+        }
+        builder
+                .addStatement("SharedPreferences.Editor editor = $N.edit()", preferencesName)
+                .addStatement(isRemove ? "editor.remove(key)" : "editor.clear()")
+                .addStatement("return editor.commit()");
+        return builder.build();
+    }
+
+    private MethodSpec createSPContainsImplMethod() {
+        return MethodSpec.methodBuilder("contains")
+                .addModifiers(PRIVATE)
+                .returns(TypeName.BOOLEAN)
+                .addParameter(TypeName.get(String.class), "key")
+                .addStatement("return $N.contains(key)", preferencesName)
+                .build();
+    }
+
+    private void createSPGetMethodSpec(MethodSpec.Builder builder, TypeName typeName,
+                                       String getMethodImplName, String fieldName, boolean hasDef) {
         fieldName = fieldName.toUpperCase();
         builder.addAnnotation(Override.class);
         builder.returns(typeName);

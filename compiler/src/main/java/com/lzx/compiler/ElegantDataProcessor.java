@@ -2,7 +2,6 @@ package com.lzx.compiler;
 
 import com.google.auto.service.AutoService;
 import com.lzx.annoation.ElegantDataMark;
-import com.lzx.annoation.EntityClass;
 import com.lzx.annoation.IgnoreField;
 import com.lzx.annoation.NameField;
 import com.lzx.annoation.ElegantEntity;
@@ -50,7 +49,7 @@ public class ElegantDataProcessor extends AbstractProcessor {
         Set<String> supportedTypes = new HashSet<>();
         supportedTypes.add(ElegantEntity.class.getCanonicalName());
         supportedTypes.add(IgnoreField.class.getCanonicalName());
-        supportedTypes.add(EntityClass.class.getCanonicalName());
+        supportedTypes.add(GeneratorHelper.CODE_PACKAGE_NAME + ".EntityClass");
         supportedTypes.add(NameField.class.getCanonicalName());
         return supportedTypes;
     }

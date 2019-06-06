@@ -2,10 +2,6 @@ package com.lzx.code;
 
 import android.support.annotation.NonNull;
 
-import org.json.JSONException;
-
-import java.io.IOException;
-
 /**
  * json数据解析
  * create by lzx
@@ -20,5 +16,5 @@ public abstract class JsonParser<T> {
 
     public abstract String convertObject(T object);
 
-    public abstract T onParse(@NonNull String json) throws IOException, JSONException;
+    public abstract T onParse(@NonNull String json);
 }

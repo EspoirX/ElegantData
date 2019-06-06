@@ -5,10 +5,6 @@ import android.support.annotation.NonNull;
 import com.google.gson.Gson;
 import com.lzx.code.JsonParser;
 
-import org.json.JSONException;
-
-import java.io.IOException;
-
 /**
  * create by lzx
  * 2019-06-05
@@ -28,7 +24,7 @@ public class SimpleJsonParser extends JsonParser<User> {
     }
 
     @Override
-    public User onParse(@NonNull String json) throws IOException, JSONException {
+    public User onParse(@NonNull String json)   {
         return mGson.fromJson(json, User.class);
     }
 }

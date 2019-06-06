@@ -1,6 +1,7 @@
 package com.lzx.elegantdata;
 
 import android.content.Context;
+import android.os.Environment;
 
 import com.lzx.annoation.ElegantDataMark;
 import com.lzx.code.ElegantData;
@@ -17,28 +18,30 @@ public abstract class AppFileDataBase extends ElegantDataBase {
 
     public abstract KeyInfo getKeyInfo();
 
-    private static AppFileDataBase INSTANCE;
+    private static AppFileDataBase spInstance;
+    private static AppFileDataBase fileInstance;
     private static final Object sLock = new Object();
 
     public static AppFileDataBase withSp(Context context) {
         synchronized (sLock) {
-            if (INSTANCE == null) {
-                INSTANCE =
+            if (spInstance == null) {
+                spInstance =
                         ElegantData.preferenceBuilder(context.getApplicationContext(), AppFileDataBase.class)
                                 .build();
             }
-            return INSTANCE;
+            return spInstance;
         }
     }
 
     public static AppFileDataBase withFile(Context context) {
         synchronized (sLock) {
-            if (INSTANCE == null) {
-                INSTANCE =
-                        ElegantData.fileBuilder(context.getApplicationContext(), "lzx_file", AppFileDataBase.class)
+            if (fileInstance == null) {
+                String path = Environment.getExternalStorageDirectory() + "/aaaaa";
+                fileInstance =
+                        ElegantData.fileBuilder(context.getApplicationContext(), path, AppFileDataBase.class)
                                 .build();
             }
-            return INSTANCE;
+            return fileInstance;
         }
     }
 }

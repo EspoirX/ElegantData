@@ -7,10 +7,10 @@ import java.lang.annotation.Target;
 
 /**
  * create by lzx
- * 2019-06-05
+ * 2019-05-29
  */
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.FIELD})
-public @interface TypeConverter {
+public @interface EntityClass {
     Class<? extends JsonParser> value();
 }
