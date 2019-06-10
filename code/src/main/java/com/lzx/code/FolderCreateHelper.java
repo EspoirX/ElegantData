@@ -45,7 +45,7 @@ public class FolderCreateHelper implements IFolderCreateHelper {
             createDestFileDir();
         }
 
-        private void createDestFileDir() {
+        private synchronized void createDestFileDir() {
             if (!TextUtils.isEmpty(destFileDir)) {
                 fileDirectory = new File(destFileDir);
                 if (!fileDirectory.exists()) {
@@ -58,7 +58,6 @@ public class FolderCreateHelper implements IFolderCreateHelper {
                     fileDirectory = context.getFilesDir();
                 }
             }
-            Log.i("xian", "fileDirectory = " + fileDirectory.getAbsolutePath());
         }
 
         File getFileDirectory() {

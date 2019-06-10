@@ -8,7 +8,7 @@ import android.content.Context;
  */
 public class FolderCreateFactory implements IFolderCreateHelper.Factory {
     @Override
-    public IFolderCreateHelper create(Context context, String name) {
-        return new FolderCreateHelper(context, name);
+    public IFolderCreateHelper create(Context context, String destFileDir) {
+        return new FolderCreateHelper(context, destFileDir);
     }
 }

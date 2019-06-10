@@ -27,6 +27,7 @@ class MarkImplGenerator {
     private ElegantDataMarkInfo markInfo;
     private Filer mFiler;
     private Map<String, String> fileNameMap = new HashMap<>();
+    private Map<String, AnnotationEntityClass> entityClassMap = new HashMap<>();
     private String packageName;
 
     MarkImplGenerator(List<AnnotationEntityClass> entityClassList, Filer filer, ElegantDataMarkInfo markInfo) {
@@ -36,6 +37,7 @@ class MarkImplGenerator {
         for (AnnotationEntityClass entityClass : entityClassList) {
             packageName = entityClass.getPackageName();
             fileNameMap.put(entityClass.getClazzName(), entityClass.getFileName());
+            entityClassMap.put(entityClass.getClazzName(), entityClass);
         }
     }
 
@@ -85,7 +87,7 @@ class MarkImplGenerator {
     private void createFieldsAndMethods(List<FieldSpec> fieldSpecs, List<MethodSpec> methodSpecs) {
         for (int i = 0; i < markInfo.mFieldInfos.size(); i++) {
             ElegantDataMarkInfo.FieldInfo fieldInfo = markInfo.mFieldInfos.get(i);
-            AnnotationEntityClass entityClass = mEntityClassList.get(i);
+            AnnotationEntityClass entityClass = entityClassMap.get(fieldInfo.getFieldTypeNameString());
 
             String spFileName = fileNameMap.get(fieldInfo.getFieldTypeNameString());
 
@@ -98,7 +100,9 @@ class MarkImplGenerator {
                     FieldSpec
                             .builder(fieldTypeName, fieldName, Modifier.PRIVATE)
                             .build());
+
             if (entityClass.getFileType() == ElegantEntity.TYPE_PREFERENCE) {
+                //System.out.println("fieldInfo.fieldName = " + fieldInfo.fieldName + " type = " + entityClass.getFileType());
                 methodSpecs.add(MethodSpec.methodBuilder(fieldInfo.fieldName)
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PUBLIC)
@@ -119,7 +123,9 @@ class MarkImplGenerator {
                         .addCode("}")
                         .build()
                 );
-            } else if (entityClass.getFileType() == ElegantEntity.TYPE_FILE) {
+            }
+            if (entityClass.getFileType() == ElegantEntity.TYPE_FILE) {
+                //System.out.println("fieldInfo.fieldName2 = " + fieldInfo.fieldName + " type = " + entityClass.getFileType());
                 methodSpecs.add(MethodSpec.methodBuilder(fieldInfo.fieldName)
                         .addAnnotation(Override.class)
                         .addModifiers(Modifier.PUBLIC)

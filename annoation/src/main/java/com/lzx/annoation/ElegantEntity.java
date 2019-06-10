@@ -17,11 +17,7 @@ public @interface ElegantEntity {
     int TYPE_PREFERENCE = 0;
     int TYPE_FILE = 1;
 
-    /**
-     * 文件名
-     */
     String fileName() default "";
 
     int fileType() default TYPE_PREFERENCE;
-
 }
