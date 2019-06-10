@@ -1,6 +1,6 @@
 # ElegantData
 
-优雅地处理数据
+像操作Room一样操作 SharedPreferences 和 File 文件.
 
 ## 使用方法
 
@@ -16,7 +16,7 @@ public interface FileCacheInfo extends IFileCacheInfoDao {
     int keyPassword = 0;
 }
 ```
-加上@ElegantEntity注解，并且定义 fileName 文件名，fileType 文件类型，fileType 默认为 SP 文件。
+加上@ElegantEntity注解，并且定义 fileName 文件名，fileType 文件类型，fileType 默认为 SharedPreferences 文件。
 
 定义好接口后 ReBuild 一下，这时候会生成一个 IXXXDao 接口，如上所示，然后继承它。
 
