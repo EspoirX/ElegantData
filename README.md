@@ -112,7 +112,7 @@ Rebuild 后，keyUserSex 会被忽略，相关字段的方法不会被生成。
 
 ## @NameField
 
-被 @IgnoreField 注解标记的字段，可以重命名：
+被 @NameField 注解标记的字段，可以重命名：
 ```java
 @ElegantEntity(fileName = "UserInfo_Preferences")
 public interface SharedPreferencesInfo extends ISharedPreferencesInfoDao {
