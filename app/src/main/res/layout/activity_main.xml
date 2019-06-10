@@ -7,30 +7,5 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <Button
-        android:id="@+id/add"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="添加" />
 
-    <Button
-        android:id="@+id/query"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="查询"
-        app:layout_constraintLeft_toRightOf="@+id/add" />
-
-    <Button
-        android:id="@+id/delete"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="删除"
-        app:layout_constraintLeft_toRightOf="@+id/query" />
-
-    <Button
-        android:id="@+id/has"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="是否存在"
-        app:layout_constraintLeft_toRightOf="@+id/delete" />
 </android.support.constraint.ConstraintLayout>

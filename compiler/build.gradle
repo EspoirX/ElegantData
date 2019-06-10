@@ -1,4 +1,15 @@
 apply plugin: 'java-library'
+apply plugin: 'com.novoda.bintray-release'
+
+publish {
+    repoName = 'ElegantData'
+    userOrg = 'lizixian'
+    groupId = 'com.lzx.elegantData'
+    artifactId = 'compiler'
+    publishVersion = '1.0.0'
+    desc = 'Operate the SharedPreferences and File files just like the Room.'
+    website = "https://github.com/EspoirX/ElegantData"
+}
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])

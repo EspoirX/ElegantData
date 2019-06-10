@@ -1,16 +1,18 @@
 apply plugin: 'com.android.library'
+apply plugin: 'com.novoda.bintray-release'
 
 android {
     compileSdkVersion 28
-
 
     defaultConfig {
         minSdkVersion 15
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"
+    }
 
-
+    lintOptions {
+        abortOnError false
     }
 
     buildTypes {
@@ -19,7 +21,16 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
 
+publish {
+    repoName = 'ElegantData'
+    userOrg = 'lizixian'
+    groupId = 'com.lzx.elegantData'
+    artifactId = 'code'
+    publishVersion = '1.0.0'
+    desc = 'Operate the SharedPreferences and File files just like the Room.'
+    website = "https://github.com/EspoirX/ElegantData"
 }
 
 dependencies {

@@ -18,7 +18,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.Elements;
 
 /**
- * @PreferenceEntity 信息封装
+ * PreferenceEntity 信息封装
  * create by lzx
  * 2019-05-29
  */
