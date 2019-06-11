@@ -2,9 +2,29 @@
 
 像操作Room一样操作 SharedPreferences 和 File 文件.
 
+[ ![](https://img.shields.io/badge/platform-android-green.svg) ](http://developer.android.com/index.html)
+[ ![Download](https://api.bintray.com/packages/lizixian/ElegantData/code/images/download.svg) ](https://bintray.com/lizixian/ElegantData/code/_latestVersion)
+[ ![](https://img.shields.io/badge/license-MIT-green.svg) ](http://choosealicense.com/licenses/mit/)
 
-（打包上传遇到点问题。。em...暂时不能使用依赖）
+## 相关文章 
+[掘金](https://juejin.im/post/5cf8d8faf265da1ba9156dc8)
 
+## 依赖
+```groovy
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'com.lzx.elegantData:code:1.0.0'
+    annotationProcessor 'com.lzx.elegantData:compiler:1.0.0'
+}
+
+repositories {
+    google()
+    jcenter()
+    maven {
+        url "https://dl.bintray.com/lizixian/ElegantData"
+    }
+}
+```
 
 ## 使用方法
 
@@ -22,8 +42,6 @@ public interface FileCacheInfo extends IFileCacheInfoDao {
 ```
 加上@ElegantEntity注解，并且定义 fileName 文件名，fileType 文件类型，fileType 默认为 SharedPreferences 文件。
 
-定义好接口后 ReBuild 一下，这时候会生成一个 IXXXDao 接口，如上所示，然后继承它。
-
 #### 二、定义一个抽象类继承 ElegantDataBase 
 
 ```java
@@ -36,6 +54,8 @@ public abstract class AppDataBase extends ElegantDataBase {
 }
 ```
 让这个类加上 @ElegantDataMark 注解，并且定义在第一步中定义的接口的抽象方法。
+
+然后后 ReBuild 一下，这时候会 build 报错，这时候会生成一个 IXXXDao 接口，然后让你的接口继承它，如上第一步所示。
 
 #### 三、使用单例模式去构建
 ```java
